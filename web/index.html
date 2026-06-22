@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>T2URL — text to URLs</title>
+    <style>
+      :root {
+        --white: #fffdf8;
+        --gold: #c9a227;
+        --gold-soft: #e8d59a;
+        --orange: #f5821f;
+        --orange-deep: #e0670a;
+        --ink: #2a2410;
+        --muted: #8a7f5c;
+        --dark: #14160f;
+        --dark-2: #1d2016;
+        --green: #5be584;
+        --green-dim: #3f9c5e;
+        --border: #ecdfb4;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--white);
+        color: var(--ink);
+        margin: 0;
+        padding: 2.5rem 1rem 4rem;
+        display: flex;
+        justify-content: center;
+      }
+      main { width: 100%; max-width: 860px; }
+
+      h1 {
+        font-size: 2.6rem;
+        margin: 0 0 0.2rem;
+        letter-spacing: -0.5px;
+        background: linear-gradient(90deg, var(--gold), var(--orange));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .sub { color: var(--muted); margin: 0 0 1.75rem; font-size: 1.02rem; }
+
+      /* Search card */
+      form {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-top: 4px solid var(--gold);
+        border-radius: 14px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        box-shadow: 0 6px 22px rgba(201, 162, 39, 0.08);
+      }
+      textarea {
+        font: inherit;
+        width: 100%;
+        min-height: 84px;
+        resize: vertical;
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: var(--white);
+        color: var(--ink);
+      }
+      textarea:focus { outline: 2px solid var(--gold-soft); border-color: var(--gold); }
+      .row { display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
+      label.inline { display: flex; align-items: center; gap: 0.45rem; color: var(--muted); font-size: 0.95rem; }
+      input[type="number"] {
+        width: 5rem; font: inherit; padding: 0.4rem;
+        border: 1px solid var(--border); border-radius: 7px; background: #fff;
+      }
+      button {
+        font: inherit; font-weight: 600;
+        border: none; border-radius: 9px;
+        padding: 0.6rem 1.4rem; cursor: pointer;
+        background: linear-gradient(90deg, var(--orange), var(--orange-deep));
+        color: #fff;
+        margin-left: auto;
+        box-shadow: 0 3px 10px rgba(245, 130, 31, 0.3);
+      }
+      button:disabled { opacity: 0.55; cursor: progress; box-shadow: none; }
+
+      #status { margin: 1.1rem 0 0; color: var(--orange-deep); min-height: 1.2em; font-weight: 500; }
+
+      /* Dark, green-lettered SQL table */
+      .table-wrap {
+        margin-top: 1.75rem;
+        background: var(--dark);
+        border: 1px solid #2c3120;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+      }
+      .table-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.9rem 1.1rem;
+        background: var(--dark-2);
+        border-bottom: 1px solid #2c3120;
+      }
+      .table-head h2 {
+        margin: 0; font-size: 1.05rem; color: var(--gold);
+        font-family: "Consolas", "SF Mono", monospace; letter-spacing: 0.5px;
+      }
+      #clear-all {
+        margin: 0; padding: 0.35rem 0.85rem; font-size: 0.85rem;
+        background: transparent; color: var(--orange);
+        border: 1px solid var(--orange); box-shadow: none;
+      }
+      #clear-all:hover { background: rgba(245, 130, 31, 0.12); }
+
+      table { width: 100%; border-collapse: collapse; font-family: "Consolas", "SF Mono", monospace; font-size: 0.9rem; }
+      thead th {
+        text-align: left; padding: 0.6rem 1.1rem;
+        color: var(--green-dim); font-weight: 600; text-transform: uppercase;
+        font-size: 0.72rem; letter-spacing: 1px; border-bottom: 1px solid #2c3120;
+      }
+      tbody td { padding: 0.7rem 1.1rem; vertical-align: top; border-bottom: 1px solid #20241699; color: var(--green); }
+      tbody tr:hover { background: #1a1d12; }
+      td.col-id { color: var(--gold); width: 2.5rem; }
+      td.col-q { color: var(--green); max-width: 220px; word-break: break-word; }
+      td.col-when { color: var(--green-dim); white-space: nowrap; font-size: 0.8rem; }
+      .url-list { display: flex; flex-direction: column; gap: 0.3rem; }
+      .url-list a { color: var(--gold-soft); text-decoration: none; word-break: break-all; }
+      .url-list a:hover { color: var(--orange); text-decoration: underline; }
+      .badge-ai { color: var(--dark); background: var(--green); border-radius: 4px; padding: 0 0.35rem; font-size: 0.68rem; margin-left: 0.4rem; }
+      .row-del {
+        background: transparent; color: var(--green-dim); border: none; box-shadow: none;
+        cursor: pointer; padding: 0.1rem 0.4rem; margin: 0; font-size: 1rem;
+      }
+      .row-del:hover { color: var(--orange); }
+      .empty { padding: 1.4rem 1.1rem; color: var(--green-dim); font-family: "Consolas", monospace; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>T2URL</h1>
+      <p class="sub">Describe what you're looking for — get a list of URLs, saved to a table.</p>
+
+      <form id="search-form">
+        <textarea
+          id="text"
+          placeholder="e.g. lightweight python libraries for parsing HTML"
+          required
+        ></textarea>
+        <div class="row">
+          <label class="inline">
+            Results
+            <input type="number" id="max_results" value="10" min="1" max="50" />
+          </label>
+          <label class="inline">
+            <input type="checkbox" id="augment" />
+            Refine with AI
+          </label>
+          <button type="submit" id="submit">Search</button>
+        </div>
+      </form>
+
+      <p id="status"></p>
+
+      <section class="table-wrap">
+        <div class="table-head">
+          <h2>&gt; saved_searches</h2>
+          <button id="clear-all" type="button">Clear all</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>URLs</th>
+              <th>When</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
