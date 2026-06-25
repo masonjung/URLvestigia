@@ -29,8 +29,8 @@ uvicorn server:app --reload
 Type a request, optionally tick **Refine with AI** (needs `ANTHROPIC_API_KEY`),
 and you get a clickable list of URLs.
 
-The UI ships with a precompiled `web/main.js`, so no Node toolchain is needed to
-run it. If you edit `web/main.ts` and want to recompile (requires Node):
+The UI ships with a precompiled `02_web/main.js`, so no Node toolchain is needed
+to run it. If you edit `02_web/main.ts` and want to recompile (requires Node):
 
 ```bash
 npm install
@@ -47,6 +47,33 @@ POST /api/search
 ->
 { "query": "...", "urls": ["https://...", ...] }
 ```
+
+### Hardening / deployment
+
+Each search hits DuckDuckGo (and, with `augment`, an LLM), so the server applies
+some basic abuse protection. All are configurable via environment variables:
+
+| Variable              | Default                          | Purpose                                              |
+|-----------------------|----------------------------------|------------------------------------------------------|
+| `T2URL_RATE_LIMIT`    | `20/minute`                      | Per-IP rate limit on `POST /api/search`.             |
+| `T2URL_ALLOW_ORIGINS` | localhost dev origins            | Comma-separated CORS allowlist (`*` to allow all).   |
+| `T2URL_ADMIN_TOKEN`   | _unset_ (DELETE routes open)     | When set, `DELETE /api/searches*` require an `X-Admin-Token` header. |
+| `T2URL_DB`            | `t2url.db` in the repo root      | Override the SQLite database path.                   |
+
+For local single-user use the defaults are fine. If you expose the server,
+set `T2URL_ALLOW_ORIGINS` to your real frontend origin and `T2URL_ADMIN_TOKEN`
+to a secret so the history-clearing endpoints aren't open to everyone.
+
+## Project layout
+
+```
+01_t2url/t2url/   the Python library (text -> URLs, search, augment, db)
+02_web/           static HTML + TypeScript frontend
+server.py         FastAPI app wiring the two together
+```
+
+`01_t2url` acts as a numbered "src" directory: `server.py` and `example.py` add
+it to the import path so the package is still imported as `from t2url import ...`.
 
 ## Usage
 

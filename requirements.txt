@@ -1,5 +1,6 @@
 ddgs>=9.0.0
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
+slowapi>=0.1.9
 # Optional — only needed for augment=True (LLM query expansion)
 anthropic>=0.40.0

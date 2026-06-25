@@ -12,11 +12,17 @@ is fully normalized rather than a blob of JSON.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "t2url.db"
+# The package now lives at <repo>/01_t2url/t2url/, so the repo root is two
+# levels up from this file's parent. Allow an explicit override via env.
+DB_PATH = Path(
+    os.environ.get("T2URL_DB")
+    or Path(__file__).resolve().parents[2] / "t2url.db"
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS searches (

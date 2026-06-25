@@ -5,10 +5,10 @@
     "moduleResolution": "bundler",
     "strict": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "outDir": "web",
-    "rootDir": "web",
+    "outDir": "02_web",
+    "rootDir": "02_web",
     "sourceMap": false,
     "skipLibCheck": true
   },
-  "include": ["web/main.ts"]
+  "include": ["02_web/main.ts"]
 }
