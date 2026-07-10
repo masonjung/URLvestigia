@@ -1,119 +1,61 @@
 # T2URL
 
-Turn natural-language text into a list of URLs using DuckDuckGo web search.
+Turn natural-language text into a list of URLs using free web search
+(DuckDuckGo by default; Google, Brave, Yahoo and more via the `ddgs`
+metasearch library).
 
-It works in two modes:
+Free to run: no API keys, no accounts, no build step. The only external
+services it talks to are the search engines' public pages.
 
-- **Plain search** (default) — your text is sent straight to DuckDuckGo.
-- **LLM-augmented search** (optional) — Claude first expands your text into
-  several focused search queries, each is searched, and the results are merged.
-
-## Install
+## Install & run
 
 ```bash
 pip install -r requirements.txt
-```
-
-`ddgs` is required. `anthropic` is only needed if you use `augment=True`.
-
-## Web UI
-
-A plain HTML + TypeScript frontend talks to a FastAPI server that wraps the
-library. Start the server and open the page:
-
-```bash
 uvicorn server:app --reload
-# then open http://127.0.0.1:8000/
+# open http://127.0.0.1:8000/
 ```
 
-Type a request, optionally tick **Refine with AI** (needs `ANTHROPIC_API_KEY`),
-and you get a clickable list of URLs.
+Type a request, pick your options (time range, search engine, region,
+safesearch, max results), and you get a clickable list of URLs. The UI is
+plain HTML and CSS rendered by the server — no JavaScript.
 
-The UI ships with a precompiled `02_web/main.js`, so no Node toolchain is needed
-to run it. If you edit `02_web/main.ts` and want to recompile (requires Node):
+## Storage
 
-```bash
-npm install
-npm run build    # or: npm run watch
-```
+The database is **SQLite**, a single file at `03_Database/t2url.db`
+(set the `T2URL_DB` env var to move it). The schema lives in
+`03_Database/schema.sql` and all SQL goes through `03_Database/db.py`.
+Every search is saved with the
+options that produced it, and the table below the form shows each one —
+query, time, engine, region, safesearch, max — alongside its URLs. Only
+links are stored, never page content. The **Dedupe URLs** button above the
+table permanently deletes duplicate URLs across searches, keeping the
+earliest occurrence.
 
-### API
-
-The server exposes one endpoint:
-
-```
-POST /api/search
-{ "text": "...", "max_results": 10, "augment": false }
-->
-{ "query": "...", "urls": ["https://...", ...] }
-```
-
-### Hardening / deployment
-
-Each search hits DuckDuckGo (and, with `augment`, an LLM), so the server applies
-some basic abuse protection. All are configurable via environment variables:
-
-| Variable              | Default                          | Purpose                                              |
-|-----------------------|----------------------------------|------------------------------------------------------|
-| `T2URL_RATE_LIMIT`    | `20/minute`                      | Per-IP rate limit on `POST /api/search`.             |
-| `T2URL_ALLOW_ORIGINS` | localhost dev origins            | Comma-separated CORS allowlist (`*` to allow all).   |
-| `T2URL_ADMIN_TOKEN`   | _unset_ (DELETE routes open)     | When set, `DELETE /api/searches*` require an `X-Admin-Token` header. |
-| `T2URL_DB`            | `t2url.db` in the repo root      | Override the SQLite database path.                   |
-
-For local single-user use the defaults are fine. If you expose the server,
-set `T2URL_ALLOW_ORIGINS` to your real frontend origin and `T2URL_ADMIN_TOKEN`
-to a secret so the history-clearing endpoints aren't open to everyone.
-
-## Project layout
-
-```
-01_t2url/t2url/   the Python library (text -> URLs, search, augment, db)
-02_web/           static HTML + TypeScript frontend
-server.py         FastAPI app wiring the two together
-```
-
-`01_t2url` acts as a numbered "src" directory: `server.py` and `example.py` add
-it to the import path so the package is still imported as `from t2url import ...`.
-
-## Usage
+## Library
 
 ```python
 from t2url import text_to_urls
 
-# Plain search — no API key needed
 urls = text_to_urls("best python web scraping libraries", max_results=10)
-
-# LLM-augmented search — needs ANTHROPIC_API_KEY in your environment
-urls = text_to_urls(
-    "how do I keep my houseplants alive in winter",
-    max_results=10,
-    augment=True,
-)
 ```
 
-### `text_to_urls(text, *, ...)`
+Options: `max_results` (10), `region` (`"wt-wt"`, e.g. `"us-en"`, `"kr-kr"`),
+`safesearch` (`"on"` / `"moderate"` / `"off"`), `timelimit` (`None`, `"d"`,
+`"w"`, `"m"`, `"y"`), and `backend` (`"duckduckgo"` by default, or `"google"`,
+`"brave"`, `"yahoo"`, `"mojeek"`, `"startpage"`, `"wikipedia"`, `"yandex"`).
+URLs come back deduplicated in ranking order.
 
-| Argument      | Default            | Description                                              |
-|---------------|--------------------|----------------------------------------------------------|
-| `max_results` | `10`               | Max URLs returned overall.                               |
-| `augment`     | `False`            | Use Claude to refine the query first.                    |
-| `max_queries` | `3`                | When augmenting, max queries to generate.                |
-| `region`      | `"wt-wt"`          | DuckDuckGo region code (e.g. `"us-en"`).                 |
-| `safesearch`  | `"moderate"`       | `"on"`, `"moderate"`, or `"off"`.                        |
-| `model`       | `"claude-opus-4-8"`| Anthropic model ID (augment only).                       |
-| `client`      | `None`             | Reuse an `anthropic.Anthropic()` instance (augment only).|
+## Layout
 
-You can also call the plain search directly:
-
-```python
-from t2url import search_urls
-urls = search_urls("python json parsing", max_results=5)
+```
+01_t2url/t2url.py       the library: text -> URLs via web search
+02_web/index.html       the UI, a Jinja2 template (HTML + CSS only)
+03_Database/db.py       sqlite persistence: all SQL lives here
+03_Database/schema.sql  the schema (tables + index)
+03_Database/t2url.db    the database itself (gitignored)
+server.py               FastAPI app: renders the page, handles form posts
 ```
 
-## How augmentation works
-
-With `augment=True`, your input is sent to Claude with a request to produce a
-handful of focused, keyword-style search queries covering distinct angles of
-the request. Each query is run through DuckDuckGo and the URLs are deduplicated
-(original ranking order preserved) up to `max_results`. If the model returns
-nothing usable, it falls back to searching your original text.
+The numbered directories act as "src" directories: `server.py` and
+`example.py` add them to the import path so `from t2url import ...` and
+`import db` work.

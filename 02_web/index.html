@@ -43,7 +43,7 @@
       .sub { color: var(--muted); margin: 0 0 1.75rem; font-size: 1.02rem; }
 
       /* Search card */
-      form {
+      form.search {
         background: #fff;
         border: 1px solid var(--border);
         border-top: 4px solid var(--gold);
@@ -66,12 +66,20 @@
         color: var(--ink);
       }
       textarea:focus { outline: 2px solid var(--gold-soft); border-color: var(--gold); }
-      .row { display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
-      label.inline { display: flex; align-items: center; gap: 0.45rem; color: var(--muted); font-size: 0.95rem; }
-      input[type="number"] {
-        width: 5rem; font: inherit; padding: 0.4rem;
-        border: 1px solid var(--border); border-radius: 7px; background: #fff;
+      /* Search options as one fill-in-the-blank sentence */
+      .sentence {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+        margin: 0; color: var(--muted); font-size: 1rem;
       }
+      .sentence select,
+      .sentence input[type="number"] {
+        font: inherit; font-weight: 600; color: var(--orange-deep);
+        background: #fff; border: 1px solid var(--border); border-radius: 7px;
+        padding: 0.3rem 0.45rem; cursor: pointer;
+      }
+      .sentence input[type="number"] { width: 4.4rem; cursor: text; }
+      .sentence select:focus,
+      .sentence input[type="number"]:focus { outline: 2px solid var(--gold-soft); border-color: var(--gold); }
       button {
         font: inherit; font-weight: 600;
         border: none; border-radius: 9px;
@@ -81,7 +89,6 @@
         margin-left: auto;
         box-shadow: 0 3px 10px rgba(245, 130, 31, 0.3);
       }
-      button:disabled { opacity: 0.55; cursor: progress; box-shadow: none; }
 
       #status { margin: 1.1rem 0 0; color: var(--orange-deep); min-height: 1.2em; font-weight: 500; }
 
@@ -104,12 +111,15 @@
         margin: 0; font-size: 1.05rem; color: var(--gold);
         font-family: "Consolas", "SF Mono", monospace; letter-spacing: 0.5px;
       }
-      #clear-all {
+      .head-actions { display: flex; gap: 0.5rem; }
+      .head-btn {
         margin: 0; padding: 0.35rem 0.85rem; font-size: 0.85rem;
         background: transparent; color: var(--orange);
         border: 1px solid var(--orange); box-shadow: none;
       }
-      #clear-all:hover { background: rgba(245, 130, 31, 0.12); }
+      .head-btn:hover { background: rgba(245, 130, 31, 0.12); }
+      #dedupe { color: var(--green); border-color: var(--green-dim); }
+      #dedupe:hover { background: rgba(91, 229, 132, 0.1); }
 
       table { width: 100%; border-collapse: collapse; font-family: "Consolas", "SF Mono", monospace; font-size: 0.9rem; }
       thead th {
@@ -122,10 +132,10 @@
       td.col-id { color: var(--gold); width: 2.5rem; }
       td.col-q { color: var(--green); max-width: 220px; word-break: break-word; }
       td.col-when { color: var(--green-dim); white-space: nowrap; font-size: 0.8rem; }
+      td.col-opt { color: var(--green-dim); white-space: nowrap; font-size: 0.8rem; }
       .url-list { display: flex; flex-direction: column; gap: 0.3rem; }
       .url-list a { color: var(--gold-soft); text-decoration: none; word-break: break-all; }
       .url-list a:hover { color: var(--orange); text-decoration: underline; }
-      .badge-ai { color: var(--dark); background: var(--green); border-radius: 4px; padding: 0 0.35rem; font-size: 0.68rem; margin-left: 0.4rem; }
       .row-del {
         background: transparent; color: var(--green-dim); border: none; box-shadow: none;
         cursor: pointer; padding: 0.1rem 0.4rem; margin: 0; font-size: 1rem;
@@ -139,31 +149,68 @@
       <h1>T2URL</h1>
       <p class="sub">Describe what you're looking for — get a list of URLs, saved to a table.</p>
 
-      <form id="search-form">
+      <form class="search" method="post" action="/search">
         <textarea
-          id="text"
+          name="text"
           placeholder="e.g. lightweight python libraries for parsing HTML"
           required
         ></textarea>
-        <div class="row">
-          <label class="inline">
-            Results
-            <input type="number" id="max_results" value="10" min="1" max="50" />
-          </label>
-          <label class="inline">
-            <input type="checkbox" id="augment" />
-            Refine with AI
-          </label>
-          <button type="submit" id="submit">Search</button>
-        </div>
+        <p class="sentence">
+          Search
+          <select name="backend" aria-label="Search engine">
+            <option value="duckduckgo" selected>DuckDuckGo</option>
+            <option value="google">Google</option>
+            <option value="brave">Brave</option>
+            <option value="yahoo">Yahoo</option>
+            <option value="mojeek">Mojeek</option>
+            <option value="startpage">Startpage</option>
+            <option value="wikipedia">Wikipedia</option>
+            <option value="yandex">Yandex</option>
+          </select>
+          for up to
+          <input type="number" name="max_results" value="10" min="1" max="50" aria-label="Max results" />
+          results from
+          <select name="timelimit" aria-label="Time range">
+            <option value="" selected>any time</option>
+            <option value="d">the past day</option>
+            <option value="w">the past week</option>
+            <option value="m">the past month</option>
+            <option value="y">the past year</option>
+          </select>
+          in
+          <select name="region" aria-label="Region">
+            <option value="wt-wt" selected>Worldwide</option>
+            <option value="us-en">the US</option>
+            <option value="uk-en">the UK</option>
+            <option value="kr-kr">Korea</option>
+            <option value="jp-jp">Japan</option>
+            <option value="de-de">Germany</option>
+            <option value="fr-fr">France</option>
+          </select>
+          with SafeSearch
+          <select name="safesearch" aria-label="SafeSearch">
+            <option value="off">off</option>
+            <option value="moderate" selected>moderate</option>
+            <option value="on">on</option>
+          </select>
+          <button type="submit">Search</button>
+        </p>
       </form>
 
-      <p id="status"></p>
+      <p id="status">{{ msg }}</p>
 
       <section class="table-wrap">
         <div class="table-head">
-          <h2>&gt; saved_searches</h2>
-          <button id="clear-all" type="button">Clear all</button>
+          <h2>&gt; saved_searches <span style="color: var(--green-dim); font-weight: 400;">— SQLite &middot; 03_Database/t2url.db</span></h2>
+          <div class="head-actions">
+            <form method="post" action="/dedupe">
+              <button id="dedupe" class="head-btn" type="submit"
+                title="Delete duplicate URLs across searches, keeping the earliest">Dedupe URLs</button>
+            </form>
+            <form method="post" action="/clear">
+              <button id="clear-all" class="head-btn" type="submit">Clear all</button>
+            </form>
+          </div>
         </div>
         <table>
           <thead>
@@ -171,15 +218,45 @@
               <th>#</th>
               <th>Question</th>
               <th>URLs</th>
-              <th>When</th>
+              <th>Time</th>
+              <th>Engine</th>
+              <th>Region</th>
+              <th>Safe</th>
+              <th>Max</th>
+              <th>Search Time</th>
               <th></th>
             </tr>
           </thead>
-          <tbody id="history-body"></tbody>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              <td class="col-id">{{ row.id }}</td>
+              <td class="col-q">{{ row.query }}</td>
+              <td>
+                <div class="url-list">
+                  {% for url in row.urls %}
+                  <a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ url }}</a>
+                  {% endfor %}
+                </div>
+              </td>
+              <td class="col-opt">{% if row.backend %}{{ row.timelimit or "any" }}{% else %}&mdash;{% endif %}</td>
+              <td class="col-opt">{{ row.backend or "&mdash;" | safe }}</td>
+              <td class="col-opt">{{ row.region or "&mdash;" | safe }}</td>
+              <td class="col-opt">{{ row.safesearch or "&mdash;" | safe }}</td>
+              <td class="col-opt">{{ row.max_results or "&mdash;" | safe }}</td>
+              <td class="col-when">{{ row.when }}</td>
+              <td>
+                <form method="post" action="/delete/{{ row.id }}">
+                  <button class="row-del" title="Delete">&#x2715;</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10" class="empty">// no searches yet — run one above</td></tr>
+            {% endfor %}
+          </tbody>
         </table>
       </section>
     </main>
-
-    <script type="module" src="./main.js"></script>
   </body>
 </html>
