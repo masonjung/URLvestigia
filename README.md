@@ -1,7 +1,7 @@
 # T2URL
 
 Turn natural-language text into a list of URLs using free web search
-(DuckDuckGo by default; Google, Brave, Yahoo and more via the `ddgs`
+(DuckDuckGo by default; Yahoo, Startpage, and Yandex via the `ddgs`
 metasearch library).
 
 Free to run: no API keys, no accounts, no build step. The only external
@@ -15,9 +15,13 @@ uvicorn server:app --reload
 # open http://127.0.0.1:8000/
 ```
 
-Type a request, pick your options (time range, search engine, region,
-safesearch, max results), and you get a clickable list of URLs. The UI is
-plain HTML and CSS rendered by the server — no JavaScript.
+Type a request, pick your options (time range, engines, region, safesearch,
+max results), and you get a clickable list of URLs. Engines are toggle
+buttons — DuckDuckGo is on by default; click to activate more (a throttled
+engine then falls through to the next) or deactivate any of them. If none
+are active the search uses DuckDuckGo; the saved table shows `any` when all
+four were used. The UI is plain HTML and CSS rendered by the server — no
+JavaScript.
 
 ## Storage
 
@@ -41,9 +45,12 @@ urls = text_to_urls("best python web scraping libraries", max_results=10)
 
 Options: `max_results` (10), `region` (`"wt-wt"`, e.g. `"us-en"`, `"kr-kr"`),
 `safesearch` (`"on"` / `"moderate"` / `"off"`), `timelimit` (`None`, `"d"`,
-`"w"`, `"m"`, `"y"`), and `backend` (`"duckduckgo"` by default, or `"google"`,
-`"brave"`, `"yahoo"`, `"mojeek"`, `"startpage"`, `"wikipedia"`, `"yandex"`).
-URLs come back deduplicated in ranking order.
+`"w"`, `"m"`, `"y"`), and `backend` — a single engine or a comma-delimited
+list (`"duckduckgo"`, `"yahoo"`, `"startpage"`, `"yandex"`, e.g.
+`"duckduckgo,yahoo"`); with a list, engines are tried until enough results
+arrive, so one throttled engine doesn't fail the search. ddgs also supports
+google, brave, mojeek, and wikipedia, but they are blocked or empty too often
+to be exposed in the UI. URLs come back deduplicated in ranking order.
 
 ## Layout
 

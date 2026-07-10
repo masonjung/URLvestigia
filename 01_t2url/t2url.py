@@ -11,8 +11,11 @@ from ddgs import DDGS
 # region: locale like "us-en", "kr-kr"; "wt-wt" for worldwide.
 # safesearch: "off", "moderate", or "on"
 # timelimit: d, w, m, y. Defaults to None (any time).
-# backend: which engine to query — duckduckgo (default), google, brave, yahoo,
-#             mojeek, startpage, wikipedia, yandex.
+# backend: which engine(s) to query — a single name or a comma-delimited list,
+#             e.g. "duckduckgo" or "duckduckgo,yahoo,startpage,yandex"; with a list,
+#             ddgs stops as soon as it has max_results, falling through on failures.
+#             (ddgs also supports google, brave, mojeek, wikipedia, but they are
+#             blocked or empty too often from this network to expose in the UI.)
 # max_results: max number of results. If None, returns results only from the first response.
 
 

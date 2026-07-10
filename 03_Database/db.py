@@ -74,6 +74,14 @@ def list_searches(limit=50):
         } for r in rows]
 
 
+def stats():
+    with _db() as conn:
+        return {
+            "searches": conn.execute("SELECT COUNT(*) FROM searches").fetchone()[0],
+            "urls": conn.execute("SELECT COUNT(*) FROM search_urls").fetchone()[0],
+        }
+
+
 def delete_search(search_id):
     with _db() as conn:
         conn.execute("DELETE FROM searches WHERE id = ?", (search_id,))

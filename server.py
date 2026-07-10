@@ -18,15 +18,14 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-app = FastAPI(title="T2URL")
+app = FastAPI(title="Webdig")
 templates = Jinja2Templates(directory=str(ROOT / "02_web"))
 db.init_db()
 
 # Allowed values per search option; first entry is the default fallback.
 OPTIONS = {
     "timelimit": ["", "d", "w", "m", "y"],
-    "backend": ["duckduckgo", "google", "brave", "yahoo",
-                "mojeek", "startpage", "wikipedia", "yandex"],
+    "backend": ["duckduckgo", "yahoo", "startpage", "yandex"],
     "safesearch": ["moderate", "off", "on"],
     "region": ["wt-wt", "us-en", "uk-en", "kr-kr", "jp-jp", "de-de", "fr-fr"],
 }
@@ -53,7 +52,17 @@ def home(request: Request, msg: str = ""):
     rows = db.list_searches()
     for r in rows:
         r["when"] = _when(r["created_at"])
-    return templates.TemplateResponse(request, "index.html", {"rows": rows, "msg": msg})
+        if r["backend"] and set(r["backend"].split(",")) == set(OPTIONS["backend"]):
+            r["backend_label"] = "any"
+        else:
+            r["backend_label"] = (r["backend"] or "").replace(",", "+") or None
+    try:
+        db_label = db.DB_PATH.relative_to(ROOT).as_posix()
+    except ValueError:
+        db_label = str(db.DB_PATH)
+    return templates.TemplateResponse(request, "index.html", {
+        "rows": rows, "msg": msg, "stats": db.stats(), "db_label": db_label,
+    })
 
 
 @app.post("/search")
@@ -61,7 +70,7 @@ def search(
     text: str = Form(...),
     max_results: int = Form(10),
     timelimit: str = Form(""),
-    backend: str = Form("duckduckgo"),
+    backend: list[str] = Form([]),
     safesearch: str = Form("moderate"),
     region: str = Form("wt-wt"),
 ):
@@ -69,9 +78,11 @@ def search(
     if not text:
         return _redirect()
     timelimit = _pick("timelimit", timelimit)
-    backend = _pick("backend", backend)
     safesearch = _pick("safesearch", safesearch)
     region = _pick("region", region)
+    # Checked engines, whitelist-filtered and deduped; none checked means the default engine.
+    engines = [b for b in dict.fromkeys(backend) if b in OPTIONS["backend"]]
+    backend = ",".join(engines or ["duckduckgo"])
     max_results = min(max(max_results, 1), 50)
     try:
         urls = t2url.text_to_urls(

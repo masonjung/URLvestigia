@@ -3,173 +3,299 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>T2URL — text to URLs</title>
+    <title>Webdig — Text to URLs</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Crect%20width='24'%20height='24'%20rx='6'%20fill='%23f5821f'/%3E%3Cg%20stroke='%231d1206'%20stroke-width='2'%20fill='none'%20stroke-linecap='round'%3E%3Ccircle%20cx='10.5'%20cy='10'%20r='5.5'/%3E%3Cpath%20d='M14.6%2014.1%2019%2018.5'/%3E%3Cpath%20d='M7.5%208.5h6M8.5%2011.5h4'/%3E%3C/g%3E%3C/svg%3E" />
     <style>
       :root {
-        --white: #fffdf8;
-        --gold: #c9a227;
-        --gold-soft: #e8d59a;
-        --orange: #f5821f;
-        --orange-deep: #e0670a;
-        --ink: #2a2410;
-        --muted: #8a7f5c;
-        --dark: #14160f;
-        --dark-2: #1d2016;
-        --green: #5be584;
-        --green-dim: #3f9c5e;
-        --border: #ecdfb4;
+        /* App shell — bright and clean, its own identity */
+        --bg: #f3f4f7;
+        --surface: #ffffff;
+        --surface-2: #f7f8fa;
+        --line: #dfe3eb;
+        --line-soft: #e9ecf1;
+        --text: #1d2433;
+        --muted: #5d6678;
+        --accent: #f5821f;
+        --accent-strong: #ff9838;
+        --accent-deep: #c1650e;
+        --accent-ink: #1d1206;
+        --focus: #e8940f;
+        --ok: #178a4c;
+        --err: #d84a2a;
+
+        /* Saved searches — dark panel with green letters */
+        --term-bg: #0d120c;
+        --term-bg-2: #121a10;
+        --term-line: #223318;
+        --term-green: #5ee98a;
+        --term-green-dim: #559d6c;
+        --term-amber: #e8c766;
       }
       * { box-sizing: border-box; }
       body {
-        font-family: "Segoe UI", system-ui, sans-serif;
-        background: var(--white);
-        color: var(--ink);
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        background:
+          radial-gradient(900px 420px at 15% -10%, rgba(245, 130, 31, 0.12), transparent 60%),
+          radial-gradient(700px 380px at 95% 0%, rgba(23, 138, 76, 0.07), transparent 55%),
+          var(--bg);
+        color: var(--text);
         margin: 0;
-        padding: 2.5rem 1rem 4rem;
+        padding: 2.5rem 1.25rem 4rem;
         display: flex;
         justify-content: center;
+        line-height: 1.5;
       }
-      main { width: 100%; max-width: 860px; }
+      main { width: 100%; max-width: 920px; }
 
+      /* ---------- Header ---------- */
+      .topbar {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.25rem;
+        margin-bottom: 1.75rem;
+      }
+      .brand { display: flex; align-items: center; gap: 0.85rem; }
+      .mark {
+        width: 46px; height: 46px; flex: none;
+        display: grid; place-items: center;
+        border-radius: 12px;
+        background: linear-gradient(140deg, var(--accent-strong), var(--accent) 55%, #c96410);
+        color: var(--accent-ink);
+        box-shadow: 0 6px 18px rgba(245, 130, 31, 0.28);
+      }
+      .mark svg { width: 27px; height: 27px; display: block; }
       h1 {
-        font-size: 2.6rem;
-        margin: 0 0 0.2rem;
-        letter-spacing: -0.5px;
-        background: linear-gradient(90deg, var(--gold), var(--orange));
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        margin: 0; font-size: 1.45rem; font-weight: 700; letter-spacing: 0.3px;
       }
-      .sub { color: var(--muted); margin: 0 0 1.75rem; font-size: 1.02rem; }
+      .tagline { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.88rem; }
+      .stats { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-left: auto; }
+      .chip {
+        font-size: 0.78rem; color: var(--muted);
+        padding: 0.3rem 0.75rem;
+        border: 1px solid var(--line); border-radius: 999px;
+        background: var(--surface);
+        white-space: nowrap;
+      }
+      .chip b { color: var(--text); font-weight: 600; }
 
-      /* Search card */
+      /* ---------- Search card ---------- */
       form.search {
-        background: #fff;
-        border: 1px solid var(--border);
-        border-top: 4px solid var(--gold);
-        border-radius: 14px;
-        padding: 1.25rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 1.4rem 1.4rem 1.25rem;
         display: flex;
         flex-direction: column;
-        gap: 0.85rem;
-        box-shadow: 0 6px 22px rgba(201, 162, 39, 0.08);
+        gap: 1rem;
+        box-shadow: 0 14px 38px rgba(23, 32, 56, 0.09);
+      }
+      .field-label {
+        margin: 0 0 -0.35rem;
+        font-size: 0.75rem; font-weight: 600; letter-spacing: 1.2px;
+        text-transform: uppercase; color: var(--muted);
       }
       textarea {
         font: inherit;
+        font-size: 1rem;
         width: 100%;
-        min-height: 84px;
+        min-height: 88px;
         resize: vertical;
-        padding: 0.75rem;
-        border: 1px solid var(--border);
-        border-radius: 9px;
-        background: var(--white);
-        color: var(--ink);
+        padding: 0.85rem 1rem;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--bg);
+        color: var(--text);
+        transition: border-color 0.15s, box-shadow 0.15s;
       }
-      textarea:focus { outline: 2px solid var(--gold-soft); border-color: var(--gold); }
-      /* Search options as one fill-in-the-blank sentence */
+      textarea::placeholder { color: #9aa3b2; }
+      textarea:focus {
+        outline: none;
+        border-color: var(--focus);
+        box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.18);
+      }
+
+      /* Options as one fill-in-the-blank sentence */
       .sentence {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-        margin: 0; color: var(--muted); font-size: 1rem;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem;
+        margin: 0; color: var(--muted); font-size: 0.94rem;
       }
       .sentence select,
       .sentence input[type="number"] {
-        font: inherit; font-weight: 600; color: var(--orange-deep);
-        background: #fff; border: 1px solid var(--border); border-radius: 7px;
-        padding: 0.3rem 0.45rem; cursor: pointer;
+        font: inherit; font-weight: 600; color: var(--text);
+        background: transparent; border: none; border-radius: 0;
+        border-bottom: 2px solid var(--line);
+        padding: 0.15rem 0.2rem; cursor: pointer;
+        transition: border-color 0.15s;
       }
-      .sentence input[type="number"] { width: 4.4rem; cursor: text; }
+      .sentence select:hover,
+      .sentence input[type="number"]:hover { border-color: var(--accent); }
+      .sentence select option { background: var(--surface-2); color: var(--text); }
+      .sentence input[type="number"] { width: 3.6rem; cursor: text; }
       .sentence select:focus,
-      .sentence input[type="number"]:focus { outline: 2px solid var(--gold-soft); border-color: var(--gold); }
-      button {
-        font: inherit; font-weight: 600;
-        border: none; border-radius: 9px;
-        padding: 0.6rem 1.4rem; cursor: pointer;
-        background: linear-gradient(90deg, var(--orange), var(--orange-deep));
-        color: #fff;
-        margin-left: auto;
-        box-shadow: 0 3px 10px rgba(245, 130, 31, 0.3);
+      .sentence input[type="number"]:focus { outline: none; border-color: var(--focus); }
+
+      /* Engine toggles: pill chips that fill when active */
+      .engines { display: inline-flex; flex-wrap: wrap; gap: 0.45rem; }
+      .engines input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+      .engines label {
+        font-size: 0.84rem; font-weight: 500; color: var(--muted);
+        padding: 0.32rem 0.85rem;
+        border: 1px solid var(--line); border-radius: 999px;
+        background: var(--bg);
+        cursor: pointer; user-select: none; white-space: nowrap;
+        transition: border-color 0.15s, color 0.15s, background 0.15s;
+      }
+      .engines label:hover { border-color: var(--accent); color: var(--text); }
+      .engines input:checked + label {
+        color: var(--accent-deep);
+        border-color: var(--accent);
+        background: rgba(245, 130, 31, 0.13);
+        font-weight: 600;
+      }
+      .engines input:focus-visible + label {
+        outline: 2px solid var(--focus); outline-offset: 2px;
       }
 
-      #status { margin: 1.1rem 0 0; color: var(--orange-deep); min-height: 1.2em; font-weight: 500; }
+      .actions { display: flex; justify-content: flex-end; }
+      button {
+        font: inherit; font-size: 0.95rem; font-weight: 700;
+        border: none; border-radius: 10px;
+        padding: 0.6rem 1.6rem; cursor: pointer;
+        background: linear-gradient(140deg, var(--accent-strong), var(--accent));
+        color: var(--accent-ink);
+        box-shadow: 0 6px 16px rgba(245, 130, 31, 0.25);
+        transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+      }
+      button:hover { filter: brightness(1.08); box-shadow: 0 8px 20px rgba(245, 130, 31, 0.32); }
+      button:active { transform: translateY(1px); box-shadow: 0 3px 10px rgba(245, 130, 31, 0.25); }
+      button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-      /* Dark, green-lettered SQL table */
+      /* ---------- Status ---------- */
+      #status {
+        margin: 1.1rem 0 0; min-height: 1.4em;
+        font-size: 0.88rem; font-weight: 500;
+      }
+      #status.ok, #status.err {
+        display: inline-block;
+        padding: 0.45rem 0.9rem;
+        border-radius: 10px;
+        border: 1px solid;
+      }
+      #status.ok { color: var(--ok); border-color: rgba(23, 138, 76, 0.35); background: rgba(23, 138, 76, 0.07); }
+      #status.err { color: var(--err); border-color: rgba(216, 74, 42, 0.35); background: rgba(216, 74, 42, 0.07); }
+
+      /* ---------- Saved searches: dark panel, green letters ---------- */
       .table-wrap {
         margin-top: 1.75rem;
-        background: var(--dark);
-        border: 1px solid #2c3120;
-        border-radius: 14px;
+        background: var(--term-bg);
+        border: 1px solid var(--term-line);
+        border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+        box-shadow: 0 16px 40px rgba(20, 30, 25, 0.22);
       }
       .table-head {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0.9rem 1.1rem;
-        background: var(--dark-2);
-        border-bottom: 1px solid #2c3120;
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+        gap: 0.6rem;
+        padding: 0.9rem 1.15rem;
+        background: var(--term-bg-2);
+        border-bottom: 1px solid var(--term-line);
       }
       .table-head h2 {
-        margin: 0; font-size: 1.05rem; color: var(--gold);
-        font-family: "Consolas", "SF Mono", monospace; letter-spacing: 0.5px;
+        margin: 0; font-size: 1rem; letter-spacing: 0.5px;
+        font-family: "Consolas", "SF Mono", monospace;
+        color: var(--term-green);
+        text-shadow: 0 0 10px rgba(94, 233, 138, 0.3);
       }
       .head-actions { display: flex; gap: 0.5rem; }
       .head-btn {
-        margin: 0; padding: 0.35rem 0.85rem; font-size: 0.85rem;
-        background: transparent; color: var(--orange);
-        border: 1px solid var(--orange); box-shadow: none;
+        font-size: 0.82rem; font-weight: 600;
+        padding: 0.35rem 0.9rem;
+        background: transparent; box-shadow: none;
+        border: 1px solid var(--term-green-dim); border-radius: 8px;
+        color: var(--term-green);
       }
-      .head-btn:hover { background: rgba(245, 130, 31, 0.12); }
-      #dedupe { color: var(--green); border-color: var(--green-dim); }
-      #dedupe:hover { background: rgba(91, 229, 132, 0.1); }
+      .head-btn:hover { background: rgba(94, 233, 138, 0.1); filter: none; box-shadow: none; }
+      #clear-all { color: #ff7a59; border-color: rgba(255, 122, 89, 0.45); }
+      #clear-all:hover { background: rgba(255, 122, 89, 0.1); }
 
-      table { width: 100%; border-collapse: collapse; font-family: "Consolas", "SF Mono", monospace; font-size: 0.9rem; }
+      .table-scroll { overflow-x: auto; }
+      table {
+        width: 100%; border-collapse: collapse;
+        font-family: "Consolas", "SF Mono", monospace; font-size: 0.88rem;
+      }
       thead th {
         text-align: left; padding: 0.6rem 1.1rem;
-        color: var(--green-dim); font-weight: 600; text-transform: uppercase;
-        font-size: 0.72rem; letter-spacing: 1px; border-bottom: 1px solid #2c3120;
+        color: var(--term-green-dim); font-weight: 600; text-transform: uppercase;
+        font-size: 0.7rem; letter-spacing: 1.2px;
+        border-bottom: 1px solid var(--term-line);
+        white-space: nowrap;
       }
-      tbody td { padding: 0.7rem 1.1rem; vertical-align: top; border-bottom: 1px solid #20241699; color: var(--green); }
-      tbody tr:hover { background: #1a1d12; }
-      td.col-id { color: var(--gold); width: 2.5rem; }
-      td.col-q { color: var(--green); max-width: 220px; word-break: break-word; }
-      td.col-when { color: var(--green-dim); white-space: nowrap; font-size: 0.8rem; }
-      td.col-opt { color: var(--green-dim); white-space: nowrap; font-size: 0.8rem; }
-      .url-list { display: flex; flex-direction: column; gap: 0.3rem; }
-      .url-list a { color: var(--gold-soft); text-decoration: none; word-break: break-all; }
-      .url-list a:hover { color: var(--orange); text-decoration: underline; }
+      tbody td {
+        padding: 0.75rem 1.1rem; vertical-align: top;
+        border-bottom: 1px solid rgba(34, 51, 24, 0.6);
+        color: var(--term-green);
+        text-shadow: 0 0 6px rgba(94, 233, 138, 0.15);
+      }
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:hover { background: rgba(94, 233, 138, 0.05); }
+      td.col-id { color: var(--term-amber); width: 2.5rem; }
+      td.col-q { max-width: 220px; word-break: break-word; }
+      td.col-when, td.col-opt { color: var(--term-green-dim); white-space: nowrap; font-size: 0.78rem; }
+      .url-list { display: flex; flex-direction: column; gap: 0.35rem; }
+      .url-list a { color: var(--term-green); text-decoration: none; word-break: break-all; }
+      .url-list a:hover { color: var(--term-amber); text-decoration: underline; }
       .row-del {
-        background: transparent; color: var(--green-dim); border: none; box-shadow: none;
-        cursor: pointer; padding: 0.1rem 0.4rem; margin: 0; font-size: 1rem;
+        background: transparent; color: var(--term-green-dim);
+        border: none; box-shadow: none;
+        cursor: pointer; padding: 0.1rem 0.4rem; margin: 0; font-size: 1rem; font-weight: 400;
       }
-      .row-del:hover { color: var(--orange); }
-      .empty { padding: 1.4rem 1.1rem; color: var(--green-dim); font-family: "Consolas", monospace; }
+      .row-del:hover { color: #ff7a59; background: transparent; filter: none; box-shadow: none; }
+      .empty {
+        padding: 1.6rem 1.15rem; color: var(--term-green-dim);
+        font-family: "Consolas", monospace;
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>T2URL</h1>
-      <p class="sub">Describe what you're looking for — get a list of URLs, saved to a table.</p>
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="10.5" cy="10" r="5.5" />
+              <path d="M14.6 14.1 19 18.5" />
+              <path d="M7.5 8.5h6" />
+              <path d="M8.5 11.5h4" />
+            </svg>
+          </div>
+          <div>
+            <h1>Webdig</h1>
+            <p class="tagline">Dig the web — turn plain text into a structured table of URLs</p>
+          </div>
+        </div>
+        <div class="stats">
+          <span class="chip"><b>{{ stats.searches }}</b> searches</span>
+          <span class="chip"><b>{{ stats.urls }}</b> URLs logged</span>
+          <span class="chip">sqlite &middot; {{ db_label }}</span>
+        </div>
+      </header>
 
       <form class="search" method="post" action="/search">
+        <p class="field-label">New search</p>
         <textarea
           name="text"
-          placeholder="e.g. lightweight python libraries for parsing HTML"
+          placeholder="e.g. Cloudera CDP use cases"
           required
         ></textarea>
         <p class="sentence">
-          Search
-          <select name="backend" aria-label="Search engine">
-            <option value="duckduckgo" selected>DuckDuckGo</option>
-            <option value="google">Google</option>
-            <option value="brave">Brave</option>
-            <option value="yahoo">Yahoo</option>
-            <option value="mojeek">Mojeek</option>
-            <option value="startpage">Startpage</option>
-            <option value="wikipedia">Wikipedia</option>
-            <option value="yandex">Yandex</option>
-          </select>
+          Search with
+          <span class="engines">
+            <input type="checkbox" id="be-ddg" name="backend" value="duckduckgo" checked /><label for="be-ddg">DuckDuckGo</label>
+            <input type="checkbox" id="be-yah" name="backend" value="yahoo" /><label for="be-yah">Yahoo</label>
+            <input type="checkbox" id="be-sta" name="backend" value="startpage" /><label for="be-sta">Startpage</label>
+            <input type="checkbox" id="be-yan" name="backend" value="yandex" /><label for="be-yan">Yandex</label>
+          </span>
           for up to
           <input type="number" name="max_results" value="10" min="1" max="50" aria-label="Max results" />
-          results from
+          URLs from
           <select name="timelimit" aria-label="Time range">
             <option value="" selected>any time</option>
             <option value="d">the past day</option>
@@ -187,21 +313,28 @@
             <option value="de-de">Germany</option>
             <option value="fr-fr">France</option>
           </select>
-          with SafeSearch
+          with
           <select name="safesearch" aria-label="SafeSearch">
             <option value="off">off</option>
             <option value="moderate" selected>moderate</option>
             <option value="on">on</option>
           </select>
-          <button type="submit">Search</button>
+          safe search.
         </p>
+        <div class="actions">
+          <button type="submit">Search</button>
+        </div>
       </form>
 
-      <p id="status">{{ msg }}</p>
+      {% if msg %}
+      <p id="status" class="{{ 'err' if msg.startswith('Error') else 'ok' }}">{{ msg }}</p>
+      {% else %}
+      <p id="status"></p>
+      {% endif %}
 
       <section class="table-wrap">
         <div class="table-head">
-          <h2>&gt; saved_searches <span style="color: var(--green-dim); font-weight: 400;">— SQLite &middot; 03_Database/t2url.db</span></h2>
+          <h2>saved_searches</h2>
           <div class="head-actions">
             <form method="post" action="/dedupe">
               <button id="dedupe" class="head-btn" type="submit"
@@ -212,6 +345,7 @@
             </form>
           </div>
         </div>
+        <div class="table-scroll">
         <table>
           <thead>
             <tr>
@@ -240,7 +374,7 @@
                 </div>
               </td>
               <td class="col-opt">{% if row.backend %}{{ row.timelimit or "any" }}{% else %}&mdash;{% endif %}</td>
-              <td class="col-opt">{{ row.backend or "&mdash;" | safe }}</td>
+              <td class="col-opt">{{ row.backend_label or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.region or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.safesearch or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.max_results or "&mdash;" | safe }}</td>
@@ -252,10 +386,11 @@
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="10" class="empty">// no searches yet — run one above</td></tr>
+            <tr><td colspan="10" class="empty">No searches yet — run one above.</td></tr>
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   </body>
