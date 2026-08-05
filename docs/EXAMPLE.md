@@ -1,0 +1,233 @@
+# Walkthrough — T2URL across every layer
+
+Follow one search from a form post to a governed row in `curated_urls`. Every command
+here runs on a laptop; nothing needs a CDP environment until the last section.
+
+Budget about 20 minutes.
+
+---
+
+## 0. Set up
+
+```bash
+pip install -r app/requirements.txt -r tests/requirements.txt
+make test          # 102 passing, 8 skipped (the live tier)
+```
+
+If that is green, every layer imports and every contract holds. Start here — a
+failure now saves you debugging the wrong thing in step 3.
+
+---
+
+## 1. The AI layer, on its own
+
+The capability, with no server and no database:
+
+```bash
+python scripts/example.py
+```
+
+```python
+# scripts/example.py, in full
+from t2url import text_to_urls
+
+for url in text_to_urls("Cloudera CDP supports use cases", max_results=16):
+    print(url)
+```
+
+That is the whole AI layer's public surface. **This call hits a live search engine** —
+if it returns nothing, an engine is throttling you, which is exactly the failure mode
+the fallback chain exists for:
+
+```python
+text_to_urls("Cloudera CDP use cases", backend="duckduckgo,yahoo,startpage")
+```
+
+`ddgs` tries each in order and stops once it has enough. → [`ai/README.md`](../ai/README.md)
+
+---
+
+## 2. The Serve layer
+
+```bash
+make dev        # → http://127.0.0.1:8000/
+```
+
+Type a question, pick engines, hit **Search**. What happens:
+
+1. `POST /search` — every option is whitelisted against `OPTIONS` in
+   [`app/server.py`](../app/server.py); `max_results` is clamped to 1–50.
+2. Checked engines are filtered, deduplicated, and joined into a fallback chain.
+   Order is preserved because order is meaningful.
+3. `t2url.text_to_urls()` runs.
+4. `db.save_search()` persists the query, its full option set, and the URLs.
+5. **303 redirect** back to `/` with a flash message — reloading never re-runs the
+   search.
+
+Try a few things that should not work:
+
+- Submit an empty box → nothing reaches a search engine.
+- Ask for 9999 results → clamped to 50.
+- Search `<script>alert(1)</script>` → rendered escaped, not executed.
+
+All three are asserted in [`tests/test_server.py`](../tests/test_server.py).
+
+---
+
+## 3. The Lakehouse layer, local tier
+
+The searches you just ran are in SQLite:
+
+```bash
+sqlite3 data/t2url.db "SELECT id, query, backend, region FROM searches ORDER BY id DESC LIMIT 5;"
+sqlite3 data/t2url.db "SELECT position, url FROM search_urls WHERE search_id = 1 ORDER BY position;"
+```
+
+Two tables, parent and child, cascade on delete. Every statement the application runs
+lives in [`data/db.py`](../data/db.py) — nowhere else.
+
+Now run two searches likely to share a result, and press **Dedupe URLs** in the UI.
+It keeps the earliest occurrence of each URL and removes any search left empty. That
+is the local tier's answer to duplication; step 5 shows the lakehouse's better one.
+
+---
+
+## 4. Ingest — crossing to the platform tier
+
+```bash
+make ingest
+```
+
+```
+T2URL ingest — DRY RUN (no writes)
+====================================================
+source     data/t2url.db
+target     spark_catalog.t2url
+watermark  (none — full load)
+
+table                            rows
+--------------------------------------
+spark_catalog.t2url.raw_searches    3
+spark_catalog.t2url.raw_search_urls 27
+```
+
+The dry run needs nothing but the standard library, which is the point — you can read
+exactly what would be written before any cluster exists. `--execute` needs Spark and
+the tables from [`data/iceberg/ddl.sql`](../data/iceberg/ddl.sql).
+
+---
+
+## 5. Process — where the interesting work is
+
+```bash
+make pipelines
+```
+
+This prints the literal `MERGE` statement that would run, plus the normalisation
+sample:
+
+```
+normalisation sample
+  in   https://WWW.Example.com/Docs/?utm_source=news&topic=iceberg#intro
+  out  https://example.com/Docs?topic=iceberg
+```
+
+**Compare this to step 3.** `db.dedupe_urls()` compares raw strings, so those two URLs
+would both survive as separate rows. The Spark job strips `www.`, tracking parameters,
+and the fragment first — and then *aggregates rather than deletes*:
+
+| | Local dedupe | Enrichment job |
+|---|---|---|
+| Compares | raw strings | normalised URLs |
+| Duplicates | deleted | counted (`times_seen`) |
+| Keeps | earliest row | earliest **and** latest sighting, best rank, every `search_id` |
+| Re-runnable | yes | yes — `MERGE` converges |
+
+Duplicates are signal. A URL six different searches returned is more interesting than
+one returned once, and the local tier throws that away.
+
+The normalisation functions are plain Python, shipped to Spark as UDFs, and tested
+without a cluster:
+
+```bash
+pytest tests/data_quality -q
+```
+
+---
+
+## 6. Governance
+
+Read [`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md).
+The shape of the whole policy set follows from one fact: **exactly one column is
+sensitive** — `raw_searches.query`, free text a user typed. Everything else is public
+web addresses or configuration.
+
+So [`governance/sdx/ranger-policies.json`](../governance/sdx/ranger-policies.json)
+stays narrow: analysts read the URL tables outright and see `query` only as a hash;
+engineers see everything; the app's service account can append to raw and nothing
+else. Narrow, and defensible in a review.
+
+Then read [`governance/model_cards/t2url-retrieval.md`](../governance/model_cards/t2url-retrieval.md) —
+in particular **what it must not be used for**. T2URL cannot tell you a document does
+not exist. Absence from the results means an engine did not rank it in the top N.
+
+Note what the model card does *not* have: a dated evaluation. That is a real gap, and
+it is why T2URL sits at ⚠️ on the Harden gate.
+
+---
+
+## 7. Deploy — the shape of it
+
+```bash
+make -n deploy     # print the make targets without running them
+make deploy        # the deploy script's own dry run — every command, no changes
+```
+
+Three steps, in this order:
+
+```
+govern → jobs → app
+```
+
+Access control lands before data moves; data lands before anything serves it. A
+deploy that publishes the app first shows a stakeholder an empty dashboard and a
+policy gap simultaneously.
+
+Provisioning is separate and runs **once** per environment:
+
+```bash
+make provision     # dry run — every CDP CLI call, printed
+```
+
+→ [`infra/README.md`](../infra/README.md), [`.cicd/README.md`](../.cicd/README.md)
+
+---
+
+## 8. Start your own
+
+```bash
+make new VERTICAL=healthcare USECASE=readmission-risk
+```
+
+Creates `../cloudera-forge-healthcare-readmission-risk/`: the layout and every
+directory's `README.md` guidance, with T2URL's own code cleared out, re-pointed to
+your name, and a fresh git history.
+
+Then work directory by directory, using each `README.md` as the guide and
+[`GATES.md`](GATES.md) as the bar for each handoff.
+
+---
+
+## What this example is meant to teach
+
+| The pattern | Where you saw it |
+|---|---|
+| Two storage tiers, one schema shape — laptop *and* lakehouse | steps 3–4 |
+| The Process layer does more than move data | step 5 |
+| Classify before you store, and let it shape the policy set | step 6 |
+| Pure functions test without a cluster; Spark ships the same code | step 5 |
+| Dry run by default for anything that changes the world | steps 4, 5, 7 |
+| Provisioning and deploying are different operations | step 7 |
+| Stating known gaps beats having them found | step 6 |
+
+The search logic is 40 lines. Everything else here is the accelerator.

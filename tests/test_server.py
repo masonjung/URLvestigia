@@ -1,0 +1,193 @@
+"""Serve layer — route tests for `app/server.py`.
+
+Retrieval is stubbed (see `conftest.client`), so these cover what the Serve layer
+is actually responsible for: input validation, POST-redirect-GET, and rendering.
+"""
+
+import pytest
+
+
+def test_home_renders(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Webdig" in response.text
+    assert "saved_searches" in response.text
+
+
+def test_empty_table_shows_a_prompt(client):
+    assert "No searches yet" in client.get("/").text
+
+
+# --- POST-redirect-GET -----------------------------------------------------
+
+def test_search_redirects_and_saves(client):
+    response = client.post("/search", data={"text": "cloudera cdp"},
+                           follow_redirects=False)
+
+    assert response.status_code == 303
+    assert client.search_calls[0]["text"] == "cloudera cdp"
+    assert "cloudera cdp" in client.get("/").text
+
+
+@pytest.mark.parametrize("route,payload", [
+    ("/search", {"text": "iceberg"}),
+    ("/dedupe", {}),
+    ("/clear", {}),
+])
+def test_mutations_always_redirect(client, route, payload):
+    """Every mutation ends in a 303 so a reload cannot re-run it."""
+    response = client.post(route, data=payload, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/")
+
+
+def test_blank_query_never_reaches_retrieval(client):
+    response = client.post("/search", data={"text": "   "}, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert client.search_calls == []
+
+
+# --- input validation ------------------------------------------------------
+
+def test_max_results_is_clamped(client):
+    client.post("/search", data={"text": "a", "max_results": 9999})
+    client.post("/search", data={"text": "b", "max_results": 0})
+
+    assert client.search_calls[0]["max_results"] == 50
+    assert client.search_calls[1]["max_results"] == 1
+
+
+@pytest.mark.parametrize("field,bad,expected", [
+    ("timelimit", "century", None),        # "" → None by the time it reaches ddgs
+    ("safesearch", "extremely", "moderate"),
+    ("region", "mars-mars", "wt-wt"),
+])
+def test_invalid_options_fall_back_to_the_default(client, field, bad, expected):
+    """`_pick` whitelists every option, so nothing user-supplied reaches a search
+    engine unchecked."""
+    client.post("/search", data={"text": "a", field: bad})
+
+    assert client.search_calls[0][field] == expected
+
+
+def test_unknown_engine_is_dropped(client):
+    client.post("/search", data={"text": "a", "backend": ["duckduckgo", "evilcorp"]})
+
+    assert client.search_calls[0]["backend"] == "duckduckgo"
+
+
+def test_no_engine_selected_falls_back_to_duckduckgo(client):
+    client.post("/search", data={"text": "a"})
+
+    assert client.search_calls[0]["backend"] == "duckduckgo"
+
+
+def test_engine_order_and_uniqueness_are_preserved(client):
+    """Order is meaningful — it is the fallback chain, not a set."""
+    client.post("/search", data={
+        "text": "a",
+        "backend": ["yahoo", "duckduckgo", "yahoo", "startpage"],
+    })
+
+    assert client.search_calls[0]["backend"] == "yahoo,duckduckgo,startpage"
+
+
+# --- result handling -------------------------------------------------------
+
+def test_retrieval_error_surfaces_as_a_message(client, monkeypatch):
+    from app import server
+
+    def boom(text, **kwargs):
+        raise RuntimeError("rate limited")
+
+    monkeypatch.setattr(server.t2url, "text_to_urls", boom)
+    response = client.post("/search", data={"text": "a"}, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert "Error" in client.get(response.headers["location"]).text
+
+
+def test_no_results_is_reported_not_silently_saved(client, monkeypatch):
+    """An empty result set must not be persisted as a successful search."""
+    from app import server
+
+    monkeypatch.setattr(server.t2url, "text_to_urls", lambda text, **kw: [])
+    response = client.post("/search", data={"text": "a"}, follow_redirects=False)
+
+    assert "No results found" in client.get(response.headers["location"]).text
+    assert "No searches yet" in client.get("/").text
+
+
+def test_results_render_as_links(client):
+    client.post("/search", data={"text": "iceberg"})
+    body = client.get("/").text
+
+    assert 'href="https://example.com/iceberg/0"' in body
+    assert 'rel="noopener noreferrer"' in body  # target=_blank without this leaks
+
+
+# --- table rendering -------------------------------------------------------
+
+def test_all_engines_selected_renders_as_any(client):
+    client.post("/search", data={
+        "text": "a",
+        "backend": ["duckduckgo", "yahoo", "startpage", "yandex"],
+    })
+
+    assert ">any<" in client.get("/").text
+
+
+def test_single_engine_renders_its_name(client):
+    client.post("/search", data={"text": "a", "backend": ["yahoo"]})
+
+    assert ">yahoo<" in client.get("/").text
+
+
+def test_query_text_is_escaped(client):
+    """Jinja2 autoescaping is the only thing standing between a search box and
+    stored XSS. Assert it rather than assume it."""
+    client.post("/search", data={"text": "<script>alert(1)</script>"})
+    body = client.get("/").text
+
+    assert "<script>alert(1)</script>" not in body
+    assert "&lt;script&gt;" in body
+
+
+# --- row actions -----------------------------------------------------------
+
+def test_delete_removes_one_row(client):
+    # Distinctive queries: the rendered page also shows the database path, and a
+    # generic word like "remove" matches the pytest tmp_path in it.
+    client.post("/search", data={"text": "zeta-survivor-query"})
+    client.post("/search", data={"text": "omega-doomed-query"})
+
+    from app import server
+    doomed = next(r["id"] for r in server.db.list_searches()
+                  if r["query"] == "omega-doomed-query")
+    client.post(f"/delete/{doomed}")
+
+    body = client.get("/").text
+    assert "zeta-survivor-query" in body
+    assert "omega-doomed-query" not in body
+
+
+def test_delete_of_a_missing_id_is_harmless(client):
+    response = client.post("/delete/999999", follow_redirects=False)
+
+    assert response.status_code == 303
+
+
+def test_dedupe_reports_when_there_is_nothing_to_do(client):
+    response = client.post("/dedupe", follow_redirects=False)
+
+    assert "No duplicate URLs found" in client.get(response.headers["location"]).text
+
+
+def test_clear_empties_the_table(client):
+    client.post("/search", data={"text": "a"})
+    client.post("/clear")
+
+    assert "No searches yet" in client.get("/").text

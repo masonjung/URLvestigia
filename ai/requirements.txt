@@ -1,0 +1,7 @@
+# AI layer dependencies.
+#   pip install -r ai/requirements.txt
+#
+# Retrieval only. No web framework, no database driver — this layer is
+# importable and testable with nothing else installed.
+
+ddgs>=9.0.0

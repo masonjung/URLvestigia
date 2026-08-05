@@ -1,6 +1,7 @@
-"""T2URL web app — everything is rendered server-side, no JavaScript.
+"""T2URL Serve layer — everything is rendered server-side, no JavaScript.
 
-Run:  uvicorn server:app --reload   then open http://127.0.0.1:8000/
+Run:  make dev   (or: uvicorn app.server:app --reload)
+then open http://127.0.0.1:8000/
 """
 
 import sys
@@ -8,9 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT / "01_t2url"))
-sys.path.insert(0, str(ROOT / "03_Database"))
+APP_DIR = Path(__file__).resolve().parent
+ROOT = APP_DIR.parent
+sys.path.insert(0, str(ROOT / "ai"))
+sys.path.insert(0, str(ROOT / "data"))
 
 import db
 import t2url
@@ -19,7 +21,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="Webdig")
-templates = Jinja2Templates(directory=str(ROOT / "02_web"))
+templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 db.init_db()
 
 # Allowed values per search option; first entry is the default fallback.

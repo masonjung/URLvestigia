@@ -1,0 +1,212 @@
+"""Process layer — normalise, deduplicate, and enrich raw search URLs.
+
+Reads `t2url.raw_search_urls` + `t2url.raw_searches`, and MERGEs one row per
+distinct URL into `t2url.curated_urls`. This is the lakehouse form of what
+`db.dedupe_urls()` does locally: keep one record per URL, remember the earliest
+sighting, drop the rest.
+
+    python pipelines/jobs/url_enrichment.py                # print the plan and SQL
+    python pipelines/jobs/url_enrichment.py --execute      # run it (needs Spark)
+
+The normalisation helpers below are deliberately pure Python with no Spark
+dependency, so `tests/data_quality/` can exercise them on a laptop. Everything
+Spark-specific lives under `run()`.
+"""
+
+import argparse
+import sys
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+# Query parameters that identify a click, not a document. Two URLs differing
+# only by these are the same page, so they must collapse to one curated row.
+TRACKING_PARAMS = frozenset({
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "utm_source_platform", "utm_creative_format",
+    "fbclid", "gclid", "gclsrc", "dclid", "msclkid", "twclid", "igshid",
+    "mc_cid", "mc_eid", "_hsenc", "_hsmi", "vero_id", "yclid", "ref_src",
+})
+
+# Hosts whose "www." prefix is cosmetic. Stripped so www.example.com and
+# example.com do not both survive deduplication.
+WWW_PREFIX = "www."
+
+
+def normalize_url(url):
+    """Collapse cosmetic differences so equal pages compare equal.
+
+    Lowercases scheme and host, strips a leading `www.`, drops tracking
+    parameters and fragments, and removes a trailing slash on the path.
+    Returns the input unchanged if it does not parse as an absolute URL.
+    """
+    if not url or not isinstance(url, str):
+        return url
+    url = url.strip()
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    if not parts.scheme or not parts.netloc:
+        return url  # relative or malformed — leave it alone rather than mangle it
+
+    host = parts.hostname or ""
+    if host.startswith(WWW_PREFIX):
+        host = host[len(WWW_PREFIX):]
+    # Preserve a non-default port; drop 80/443 since they are implied.
+    netloc = host
+    if parts.port and parts.port not in (80, 443):
+        netloc = f"{host}:{parts.port}"
+
+    kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+            if k.lower() not in TRACKING_PARAMS]
+    path = parts.path.rstrip("/") or "/"
+
+    return urlunsplit((parts.scheme.lower(), netloc, path, urlencode(kept), ""))
+
+
+def url_parts(url):
+    """Split a URL into the (domain, tld, scheme) columns of `curated_urls`."""
+    try:
+        parts = urlsplit(url or "")
+    except ValueError:
+        return None, None, None
+    host = (parts.hostname or "").lower()
+    if host.startswith(WWW_PREFIX):
+        host = host[len(WWW_PREFIX):]
+    tld = host.rsplit(".", 1)[-1] if "." in host else None
+    return (host or None), tld, (parts.scheme.lower() or None)
+
+
+# The MERGE is expressed as SQL rather than a DataFrame write so the dry run can
+# print exactly what will execute — no hidden plan.
+MERGE_SQL = """
+MERGE INTO {prefix}.curated_urls AS target
+USING staged_urls AS source
+   ON target.url = source.url
+ WHEN MATCHED THEN UPDATE SET
+      target.last_seen     = GREATEST(target.last_seen, source.last_seen),
+      target.first_seen    = LEAST(target.first_seen, source.first_seen),
+      target.times_seen    = target.times_seen + source.times_seen,
+      target.best_position = LEAST(target.best_position, source.best_position),
+      target.search_ids    = array_distinct(
+                                 concat(target.search_ids, source.search_ids)),
+      target.processed_at  = source.processed_at
+ WHEN NOT MATCHED THEN INSERT *
+"""
+
+STAGE_SQL = """
+SELECT url,
+       domain,
+       tld,
+       scheme,
+       MIN(created_at)          AS first_seen,
+       MAX(created_at)          AS last_seen,
+       COUNT(DISTINCT search_id) AS times_seen,
+       MIN(position)            AS best_position,
+       array_distinct(collect_list(search_id)) AS search_ids,
+       current_timestamp()      AS processed_at
+  FROM normalised
+ WHERE url IS NOT NULL AND domain IS NOT NULL
+ GROUP BY url, domain, tld, scheme
+"""
+
+
+def run(args):
+    """Execute the enrichment against Iceberg. Requires Spark."""
+    try:
+        from pyspark.sql import SparkSession
+        from pyspark.sql import functions as F
+        from pyspark.sql.types import StringType, StructField, StructType
+    except ImportError:
+        raise SystemExit(
+            "--execute needs pyspark. Submit this through Cloudera Data Engineering "
+            "(see pipelines/cde/url_enrichment.job.yaml) or run it from a Cloudera AI "
+            "session. Drop --execute to see the plan."
+        )
+
+    prefix = f"{args.catalog}.{args.database}" if args.catalog else args.database
+    spark = (
+        SparkSession.builder
+        .appName("t2url-url-enrichment")
+        .config("spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+        .getOrCreate()
+    )
+
+    # normalize_url and url_parts are shipped as UDFs so the same code path that
+    # tests/ verifies is the one that runs on the cluster.
+    norm_udf = F.udf(normalize_url, StringType())
+    parts_udf = F.udf(url_parts, StructType([
+        StructField("domain", StringType()),
+        StructField("tld", StringType()),
+        StructField("scheme", StringType()),
+    ]))
+
+    raw = spark.table(f"{prefix}.raw_search_urls")
+    if args.since:
+        raw = raw.where(F.col("created_at") > F.lit(args.since).cast("timestamp"))
+
+    normalised = (
+        raw.withColumn("url", norm_udf(F.col("url")))
+           .withColumn("_p", parts_udf(F.col("url")))
+           .select("search_id", "position", "url", "created_at",
+                   F.col("_p.domain").alias("domain"),
+                   F.col("_p.tld").alias("tld"),
+                   F.col("_p.scheme").alias("scheme"))
+    )
+    normalised.createOrReplaceTempView("normalised")
+
+    staged = spark.sql(STAGE_SQL)
+    staged.createOrReplaceTempView("staged_urls")
+    staged_count = staged.count()
+
+    spark.sql(MERGE_SQL.format(prefix=prefix))
+
+    total = spark.table(f"{prefix}.curated_urls").count()
+    print(f"staged {staged_count} distinct URLs -> {prefix}.curated_urls "
+          f"({total} rows total)")
+    spark.stop()
+
+
+def print_plan(args):
+    """Print what --execute would do, including the literal MERGE statement."""
+    prefix = f"{args.catalog}.{args.database}" if args.catalog else args.database
+    # Printed output stays ASCII: this runs on a Windows console where the
+    # default cp1252 codec raises on characters like U+2192.
+    print(f"T2URL url_enrichment -- DRY RUN (no writes)\n{'=' * 52}")
+    print(f"read   {prefix}.raw_search_urls  (joined to raw_searches on search_id)")
+    print(f"write  {prefix}.curated_urls     (MERGE on url)")
+    print(f"since  {args.since or '(none - full rebuild)'}\n")
+    print("transform")
+    print("  1. normalize_url()  lowercase host, strip www./tracking params/fragment")
+    print("  2. url_parts()      derive domain, tld, scheme")
+    print("  3. group by url     first_seen, last_seen, times_seen, best_position\n")
+
+    sample = "https://WWW.Example.com/Docs/?utm_source=news&topic=iceberg#intro"
+    print(f"normalisation sample\n  in   {sample}\n  out  {normalize_url(sample)}\n")
+    print("staging query:" + STAGE_SQL)
+    print("merge:" + MERGE_SQL.format(prefix=prefix))
+    print("Re-run with --execute to apply.")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--catalog", default="spark_catalog",
+                        help="Iceberg catalog name (default: spark_catalog)")
+    parser.add_argument("--database", default="t2url",
+                        help="Target database (default: t2url)")
+    parser.add_argument("--since", default="",
+                        help="Only process rows with created_at greater than this "
+                             "ISO-8601 UTC timestamp. Omit for a full rebuild.")
+    parser.add_argument("--execute", action="store_true",
+                        help="Actually run it. Without it, print the plan and exit.")
+    args = parser.parse_args(argv)
+
+    if args.execute:
+        run(args)
+    else:
+        print_plan(args)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

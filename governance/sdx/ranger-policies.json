@@ -1,0 +1,166 @@
+{
+  "_comment": [
+    "T2URL — SDX / Apache Ranger policy definitions for the Hive-Iceberg service.",
+    "",
+    "Import with:  .cicd/deploy.sh govern   (or by hand)",
+    "  curl -u $RANGER_ADMIN -X POST -H 'Content-Type: application/json' \\",
+    "       -d @governance/sdx/ranger-policies.json \\",
+    "       \"$RANGER_URL/service/plugins/policies/importPoliciesFromFile?updateIfExists=true\"",
+    "",
+    "Replace ${CDP_ENV} with the environment name at deploy time. Groups map to",
+    "the customer's IdP and are placeholders here — repoint them before import.",
+    "",
+    "Design rationale: exactly one column in this accelerator is sensitive -",
+    "raw_searches.query, free text typed by a user. Everything else is public web",
+    "data or configuration. See ../DATA_CLASSIFICATION.md. So the policy set is",
+    "narrow on purpose: analysts get the URL tables outright and see the query",
+    "column only as a hash."
+  ],
+
+  "serviceName": "${CDP_ENV}_hive",
+  "serviceType": "hive",
+
+  "policies": [
+    {
+      "name": "t2url-engineer-full",
+      "description": "Data engineers own the T2URL database end to end - they write the DDL, run the pipelines, and fix the data when a load goes wrong.",
+      "isEnabled": true,
+      "isAuditEnabled": true,
+      "resources": {
+        "database": { "values": ["t2url"], "isExcludes": false, "isRecursive": false },
+        "table": { "values": ["*"], "isExcludes": false, "isRecursive": false },
+        "column": { "values": ["*"], "isExcludes": false, "isRecursive": false }
+      },
+      "policyItems": [
+        {
+          "groups": ["t2url_data_engineers"],
+          "accesses": [
+            { "type": "select", "isAllowed": true },
+            { "type": "update", "isAllowed": true },
+            { "type": "create", "isAllowed": true },
+            { "type": "drop", "isAllowed": true },
+            { "type": "alter", "isAllowed": true },
+            { "type": "index", "isAllowed": true },
+            { "type": "lock", "isAllowed": true },
+            { "type": "all", "isAllowed": true }
+          ],
+          "delegateAdmin": true
+        }
+      ]
+    },
+
+    {
+      "name": "t2url-app-service-account",
+      "description": "The Serve layer's service account. Reads and appends raw tables; never touches curated_urls, which is pipeline output only.",
+      "isEnabled": true,
+      "isAuditEnabled": true,
+      "resources": {
+        "database": { "values": ["t2url"], "isExcludes": false, "isRecursive": false },
+        "table": { "values": ["raw_searches", "raw_search_urls"], "isExcludes": false, "isRecursive": false },
+        "column": { "values": ["*"], "isExcludes": false, "isRecursive": false }
+      },
+      "policyItems": [
+        {
+          "users": ["srv_t2url_app"],
+          "accesses": [
+            { "type": "select", "isAllowed": true },
+            { "type": "update", "isAllowed": true }
+          ],
+          "delegateAdmin": false
+        }
+      ]
+    },
+
+    {
+      "name": "t2url-analyst-read-urls",
+      "description": "Analysts read the URL tables outright - these are public web addresses returned by public search engines, classified Public.",
+      "isEnabled": true,
+      "isAuditEnabled": true,
+      "resources": {
+        "database": { "values": ["t2url"], "isExcludes": false, "isRecursive": false },
+        "table": { "values": ["curated_urls", "raw_search_urls"], "isExcludes": false, "isRecursive": false },
+        "column": { "values": ["*"], "isExcludes": false, "isRecursive": false }
+      },
+      "policyItems": [
+        {
+          "groups": ["t2url_analysts"],
+          "accesses": [{ "type": "select", "isAllowed": true }],
+          "delegateAdmin": false
+        }
+      ]
+    },
+
+    {
+      "name": "t2url-analyst-read-searches",
+      "description": "Analysts read search metadata - the options that produced each result set. The query column itself is masked by t2url-mask-query-text.",
+      "isEnabled": true,
+      "isAuditEnabled": true,
+      "resources": {
+        "database": { "values": ["t2url"], "isExcludes": false, "isRecursive": false },
+        "table": { "values": ["raw_searches"], "isExcludes": false, "isRecursive": false },
+        "column": { "values": ["*"], "isExcludes": false, "isRecursive": false }
+      },
+      "policyItems": [
+        {
+          "groups": ["t2url_analysts"],
+          "accesses": [{ "type": "select", "isAllowed": true }],
+          "delegateAdmin": false
+        }
+      ]
+    }
+  ],
+
+  "maskingPolicies": [
+    {
+      "name": "t2url-mask-query-text",
+      "description": "Hash raw_searches.query for analysts. Free text a user typed is Confidential; hashing preserves grouping and join behaviour for analysis while withholding the text itself. Engineers are not in this policy and see the raw value.",
+      "isEnabled": true,
+      "isAuditEnabled": true,
+      "policyType": 1,
+      "resources": {
+        "database": { "values": ["t2url"], "isExcludes": false, "isRecursive": false },
+        "table": { "values": ["raw_searches"], "isExcludes": false, "isRecursive": false },
+        "column": { "values": ["query"], "isExcludes": false, "isRecursive": false }
+      },
+      "dataMaskPolicyItems": [
+        {
+          "groups": ["t2url_analysts"],
+          "accesses": [{ "type": "select", "isAllowed": true }],
+          "dataMaskInfo": { "dataMaskType": "MASK_HASH" }
+        }
+      ]
+    }
+  ],
+
+  "rowFilterPolicies": [
+    {
+      "name": "t2url-filter-analyst-recent",
+      "description": "Analysts see the trailing 90 days. Older search history has no analytical use here and every extra day is retained behavioural data - a filter is cheaper than a retention argument. Widen deliberately, not by default.",
+      "isEnabled": true,
+      "isAuditEnabled": true,
+      "policyType": 2,
+      "resources": {
+        "database": { "values": ["t2url"], "isExcludes": false, "isRecursive": false },
+        "table": { "values": ["raw_searches"], "isExcludes": false, "isRecursive": false }
+      },
+      "rowFilterPolicyItems": [
+        {
+          "groups": ["t2url_analysts"],
+          "accesses": [{ "type": "select", "isAllowed": true }],
+          "rowFilterInfo": {
+            "filterExpr": "created_at >= date_sub(current_date(), 90)"
+          }
+        }
+      ]
+    }
+  ],
+
+  "tagPolicies": {
+    "_comment": "Atlas classifications applied to T2URL assets. Attach at table creation so lineage and tag-based policies work from the first load rather than being backfilled.",
+    "classifications": [
+      { "name": "PUBLIC_WEB_DATA", "appliedTo": ["t2url.curated_urls", "t2url.raw_search_urls"] },
+      { "name": "USER_SUPPLIED_TEXT", "appliedTo": ["t2url.raw_searches.query"] },
+      { "name": "THIRD_PARTY_SOURCED", "appliedTo": ["t2url.raw_searches", "t2url.raw_search_urls"] }
+    ]
+  }
+}

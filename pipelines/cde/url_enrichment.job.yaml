@@ -1,0 +1,56 @@
+# Cloudera Data Engineering job definition — T2URL URL enrichment.
+#
+# Apply with the CDE CLI (the cluster endpoint comes from `cde profile`):
+#   cde resource create --name t2url-jobs
+#   cde resource upload --name t2url-jobs \
+#       --local-path pipelines/jobs/url_enrichment.py
+#   cde job import --file pipelines/cde/url_enrichment.job.yaml
+#
+# `.cicd/deploy.sh` does exactly this on every merge to main.
+
+apiVersion: cde.cloudera.com/v1
+kind: Job
+
+jobs:
+  - name: t2url-url-enrichment
+    type: spark
+    # Runs after ingest lands the day's searches. Daily is right for T2URL's
+    # volume; move to hourly only when the ingest cadence justifies it.
+    schedule:
+      enabled: true
+      cronExpression: "30 2 * * *"
+      # Backfills are explicit, never implicit — a missed window is rerun by hand
+      # with --since so the operator sees the range being reprocessed.
+      catchup: false
+      startDate: "2026-01-01"
+    spark:
+      file: url_enrichment.py
+      args:
+        - "--catalog"
+        - "spark_catalog"
+        - "--database"
+        - "t2url"
+        - "--execute"
+      # T2URL's tables are small. These sizes are deliberately modest — raise
+      # them from measured spill, not from optimism.
+      driverCores: 1
+      driverMemory: "2g"
+      executorCores: 2
+      executorMemory: "4g"
+      numExecutors: 2
+      conf:
+        spark.sql.extensions: "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+        spark.sql.catalog.spark_catalog: "org.apache.iceberg.spark.SparkSessionCatalog"
+        spark.sql.catalog.spark_catalog.type: "hive"
+        # The MERGE writes small deletes; adaptive coalescing keeps the curated
+        # table from accumulating tiny files between compactions.
+        spark.sql.adaptive.enabled: "true"
+        spark.sql.adaptive.coalescePartitions.enabled: "true"
+    mounts:
+      - resourceName: t2url-jobs
+    logRetentionPolicy:
+      retentionDays: 30
+
+resources:
+  - name: t2url-jobs
+    type: files

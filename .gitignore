@@ -5,20 +5,48 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.tmp/
+report.xml
 
-# Node / TypeScript
+# Node / TypeScript (if a JS front-end is added to app/)
 node_modules/
 *.tsbuildinfo
 
-# SQLite database
+# SQLite — the dev store is generated, never committed
 *.db
+*.db-journal
+*.db-wal
 
-# Env / secrets
+# Terraform — state can carry resource metadata and must not be committed
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+crash.log
+
+# Cloudera / CDP
+.cdp/
+cde-profile.yaml
+
+# Spark / Iceberg local scratch
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Env / secrets — nothing in this repo may contain a credential
 .env
 .env.*
+*.pem
+*.key
 
-# OS / editor
+# OS / editor / local tooling
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+.claude/
