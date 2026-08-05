@@ -45,7 +45,12 @@
         justify-content: center;
         line-height: 1.5;
       }
-      main { width: 100%; max-width: 920px; }
+      /* Ten columns of search metadata need more room than a prose column.
+         min-width:0 keeps this flex item from flooring at the table's min-content
+         width, so .table-scroll owns any table overflow. Note the page still scrolls
+         sideways below ~600px for a separate, pre-existing reason — there are no
+         media queries here yet and the layout is desktop-first. */
+      main { width: 100%; max-width: 1040px; min-width: 0; }
 
       /* ---------- Header ---------- */
       .topbar {
@@ -237,10 +242,20 @@
       tbody tr:last-child td { border-bottom: none; }
       tbody tr:hover { background: rgba(94, 233, 138, 0.05); }
       td.col-id { color: var(--term-amber); width: 2.5rem; }
-      td.col-q { max-width: 220px; word-break: break-word; }
+      td.col-q { min-width: 140px; max-width: 220px; word-break: break-word; }
+      /* The URLs are the content; the option columns are metadata. Without a floor
+         here the nowrap columns win the auto layout and break-all crushes every URL
+         to one character per line. .table-scroll takes the overflow instead. */
+      td.col-urls, th.col-urls { min-width: 340px; }
+      /* Metadata is narrow by nature — full cell padding on six of them is what
+         pushed the table past the panel. */
       td.col-when, td.col-opt { color: var(--term-green-dim); white-space: nowrap; font-size: 0.78rem; }
+      td.col-when, td.col-opt, th.col-opt, th.col-when { padding-left: 0.6rem; padding-right: 0.6rem; }
+      /* A full fallback chain is the one long value here; let it wrap. It joins on
+         "+" with no spaces, so normal wrapping alone finds no break opportunity. */
+      td.col-engine { white-space: normal; overflow-wrap: anywhere; min-width: 5.5rem; }
       .url-list { display: flex; flex-direction: column; gap: 0.35rem; }
-      .url-list a { color: var(--term-green); text-decoration: none; word-break: break-all; }
+      .url-list a { color: var(--term-green); text-decoration: none; word-break: break-word; overflow-wrap: anywhere; }
       .url-list a:hover { color: var(--term-amber); text-decoration: underline; }
       .row-del {
         background: transparent; color: var(--term-green-dim);
@@ -351,13 +366,13 @@
             <tr>
               <th>#</th>
               <th>Question</th>
-              <th>URLs</th>
-              <th>Time</th>
-              <th>Engine</th>
-              <th>Region</th>
-              <th>Safe</th>
-              <th>Max</th>
-              <th>Search Time</th>
+              <th class="col-urls">URLs</th>
+              <th class="col-opt">Time</th>
+              <th class="col-opt">Engine</th>
+              <th class="col-opt">Region</th>
+              <th class="col-opt">Safe</th>
+              <th class="col-opt">Max</th>
+              <th class="col-when">Search Time</th>
               <th></th>
             </tr>
           </thead>
@@ -366,7 +381,7 @@
             <tr>
               <td class="col-id">{{ row.id }}</td>
               <td class="col-q">{{ row.query }}</td>
-              <td>
+              <td class="col-urls">
                 <div class="url-list">
                   {% for url in row.urls %}
                   <a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ url }}</a>
@@ -374,7 +389,7 @@
                 </div>
               </td>
               <td class="col-opt">{% if row.backend %}{{ row.timelimit or "any" }}{% else %}&mdash;{% endif %}</td>
-              <td class="col-opt">{{ row.backend_label or "&mdash;" | safe }}</td>
+              <td class="col-opt col-engine">{{ row.backend_label or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.region or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.safesearch or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.max_results or "&mdash;" | safe }}</td>
