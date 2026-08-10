@@ -1,15 +1,18 @@
 # T2URL — Cloudera Forge Accelerator
 
 **Natural-language text in, a governed table of URLs out.** Type a question, get a
-persisted list of source links — with the query, engines, region, and time window
-stored alongside, so a search becomes an artifact instead of an activity.
+persisted list of source links — with the query, provider, engines, region, and time
+window stored alongside, so a search becomes an artifact instead of an activity.
+
+Search the web, Wikipedia, OpenAlex, or arXiv. Each exposes only the options it
+genuinely applies, and the record says which.
 
 Built to the Cloudera Forge standard accelerator layout: every layer of the reference
 stack — Ingest → Lakehouse → Process → AI → Serve — wired end to end and governed by
 SDX.
 
 Free to run: no API keys, no accounts, no build step. The only external services it
-talks to are the search engines' public pages.
+talks to are public search-engine pages and three keyless non-profit APIs.
 
 **New here?** Walk [`docs/EXAMPLE.md`](docs/EXAMPLE.md) — one search traced across all
 five layers in about 20 minutes, on a laptop. Then use
@@ -23,7 +26,7 @@ make install
 make dev                 # → http://127.0.0.1:8000/
 
 # 2. The Harden gate
-make test                # 102 passing, 8 skipped (the live tier)
+make test                # 186 passing, 13 skipped (the live tier)
 
 # 3. See how the whole solution deploys (every step dry-runs)
 make -n deploy
@@ -65,8 +68,11 @@ and which Cloudera API/tool automates it.
    app/server.py ──── whitelists every option, clamps max_results to 1–50
         │
         ▼
-   ai/t2url.py ────── ddgs → DuckDuckGo · Yahoo · Startpage · Yandex
-        │             fallback chain: a throttled engine doesn't fail the search
+   ai/t2url.py ────── one provider per search:
+        │             ddgs → DuckDuckGo · Yahoo · Startpage · Yandex
+        │                    fallback chain: a throttled engine doesn't fail it
+        │             wikipedia · openalex · arxiv → their own keyless APIs
+        │             options a provider can't apply are dropped, then stored NULL
         ▼
    data/db.py ─────── SQLite (dev)  ──► data/ingest/ ──► Iceberg raw tables
         │                                                      │
@@ -95,12 +101,14 @@ Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
   entirely server-side with **no JavaScript and no build step**. Every option is
   whitelist-validated; every mutation is POST-redirect-GET. The design system is
   documented in [`docs/architecture/DESIGN_TEMPLATE.md`](docs/architecture/DESIGN_TEMPLATE.md).
-- **`ai/`** — `text_to_urls()`, the whole capability in 40 lines, plus an eval
-  notebook that measures engine availability and overlap before you change a default.
+- **`ai/`** — `text_to_urls()`, the whole capability behind one function, with four
+  selectable corpora and a support matrix that decides what each one may be asked;
+  plus an eval notebook that measures availability and overlap before you change a
+  default.
 - **`data/` `pipelines/` `governance/` `infra/` `tests/`** — a thin but complete
   accelerator wired across every layer: Iceberg DDL, a Spark enrichment job with a CDE
   job spec, Ranger policies with a masking rule, CDP CLI *and* Terraform provisioning,
-  and 102 passing tests. Walkthrough: [`docs/EXAMPLE.md`](docs/EXAMPLE.md).
+  and 186 passing tests. Walkthrough: [`docs/EXAMPLE.md`](docs/EXAMPLE.md).
 - **`scripts/new-accelerator.sh`** (via `make new`) — clones this template into a
   fresh, re-pointed, git-initialised accelerator repo.
 
@@ -112,11 +120,17 @@ from t2url import text_to_urls
 urls = text_to_urls("best python web scraping libraries", max_results=10)
 ```
 
-Options: `max_results` (10), `region` (`"wt-wt"`, e.g. `"us-en"`, `"kr-kr"`),
-`safesearch` (`"on"` / `"moderate"` / `"off"`), `timelimit` (`None`, `"d"`, `"w"`,
-`"m"`, `"y"`), and `backend` — one engine or a comma-delimited fallback chain
-(`"duckduckgo,yahoo"`). URLs come back deduplicated, in ranking order. Details in
-[`ai/README.md`](ai/README.md).
+Options: `provider` (`"ddgs"`, `"wikipedia"`, `"openalex"`, `"arxiv"`), `max_results`
+(10), `region` (`"wt-wt"`, e.g. `"us-en"`, `"kr-kr"`), `safesearch` (`"on"` /
+`"moderate"` / `"off"`), `timelimit` (`None`, `"d"`, `"w"`, `"m"`, `"y"`), and
+`backend` — one engine or a comma-delimited fallback chain (`"duckduckgo,yahoo"`).
+URLs come back deduplicated, in ranking order.
+
+**Not every provider supports every option**, and the ones that don't apply are
+dropped rather than silently ignored — `region` selects a Wikipedia language
+edition, `timelimit` filters OpenAlex and arXiv by publication date, and neither
+`safesearch` nor the engine chain means anything outside `ddgs`. The support matrix
+and the reasoning are in [`ai/README.md`](ai/README.md).
 
 ## The ~8-week lifecycle
 

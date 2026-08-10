@@ -95,6 +95,71 @@ def test_engine_order_and_uniqueness_are_preserved(client):
     assert client.search_calls[0]["backend"] == "yahoo,duckduckgo,startpage"
 
 
+# --- provider selection ----------------------------------------------------
+
+@pytest.mark.parametrize("provider", ["ddgs", "wikipedia", "openalex", "arxiv"])
+def test_every_ui_provider_is_accepted(client, provider):
+    """A typo here is a radio button that silently searches the web instead."""
+    client.post("/search", data={"text": "a", "provider": provider})
+
+    assert client.search_calls[0]["provider"] == provider
+
+
+def test_unknown_provider_falls_back_to_the_default(client):
+    client.post("/search", data={"text": "a", "provider": "evilcorp"})
+
+    assert client.search_calls[0]["provider"] == "ddgs"
+
+
+def test_no_provider_selected_defaults_to_web(client):
+    """Existing clients post no `provider` field at all."""
+    client.post("/search", data={"text": "a"})
+
+    assert client.search_calls[0]["provider"] == "ddgs"
+
+
+def test_unsupported_options_are_stored_null_not_as_posted(client, temp_db):
+    """The governed record must not claim a filter that never ran.
+
+    A hidden control still posts its value — CSS cannot prevent that — so the
+    server is the only place this can be enforced. Wikipedia applies no time
+    window and no safe search, so both must land as NULL however the form arrives.
+    """
+    client.post("/search", data={
+        "text": "a", "provider": "wikipedia",
+        "timelimit": "w", "safesearch": "on", "region": "kr-kr",
+        "backend": ["yahoo"],
+    })
+
+    row = temp_db.list_searches()[0]
+    assert row["provider"] == "wikipedia"
+    assert row["region"] == "kr-kr"      # supported, applied
+    assert row["timelimit"] is None      # not supported
+    assert row["safesearch"] is None     # not supported
+    assert row["backend"] is None        # not supported
+
+
+def test_supported_but_unset_is_stored_empty_not_null(client, temp_db):
+    """The distinction NULL carries only works if "" carries the other half: a web
+    search with no time window is not the same record as a corpus that has none."""
+    client.post("/search", data={"text": "a", "provider": "ddgs", "timelimit": ""})
+
+    row = temp_db.list_searches()[0]
+    assert row["timelimit"] == ""
+    assert row["safesearch"] == "moderate"
+    assert row["backend"] == "duckduckgo"
+
+
+def test_scholarly_provider_records_its_time_window(client, temp_db):
+    """arXiv supports a period even though it supports no region."""
+    client.post("/search", data={
+        "text": "a", "provider": "arxiv", "timelimit": "y", "region": "kr-kr"})
+
+    row = temp_db.list_searches()[0]
+    assert row["timelimit"] == "y"
+    assert row["region"] is None
+
+
 # --- result handling -------------------------------------------------------
 
 def test_retrieval_error_surfaces_as_a_message(client, monkeypatch):
@@ -131,19 +196,71 @@ def test_results_render_as_links(client):
 
 # --- table rendering -------------------------------------------------------
 
-def test_all_engines_selected_renders_as_any(client):
+def test_all_engines_selected_renders_every_engine(client):
+    """A full selection is listed, not summarised as "any".
+
+    Three reasons the summary was wrong: it hid which engines were asked, it
+    collided with the Time column's "any" (which means "no time limit") in the
+    next cell, and it was computed against the *current* engine list — so adding
+    a fifth engine would have retroactively re-labelled every historical row that
+    had asked for four.
+    """
     client.post("/search", data={
         "text": "a",
         "backend": ["duckduckgo", "yahoo", "startpage", "yandex"],
     })
+    body = client.get("/").text
 
-    assert ">any<" in client.get("/").text
+    assert ">duckduckgo+yahoo+startpage+yandex<" in body
+    # Scoped to the engine cell: the Time column's "any" is a different claim and
+    # a legitimate one. Needing this scoping is the collision itself.
+    assert 'col-engine">any<' not in body
+
+
+def test_engine_label_preserves_selection_order(client):
+    """The stored order is the order asked; the label must not sort or normalise
+    it, or the column stops matching the `backend` column it renders."""
+    client.post("/search", data={
+        "text": "a", "backend": ["startpage", "duckduckgo"]})
+
+    assert ">startpage+duckduckgo<" in client.get("/").text
 
 
 def test_single_engine_renders_its_name(client):
     client.post("/search", data={"text": "a", "backend": ["yahoo"]})
 
     assert ">yahoo<" in client.get("/").text
+
+
+def test_provider_column_shows_a_readable_label(client):
+    client.post("/search", data={"text": "a", "provider": "openalex"})
+
+    assert ">OpenAlex<" in client.get("/").text
+
+
+def test_unsupported_and_unset_render_differently(client):
+    """The table has to distinguish "this corpus has no time filter" from "it has
+    one and you did not use it". Collapsing them is the reporting half of the same
+    false claim the NULL storage prevents."""
+    client.post("/search", data={"text": "web", "provider": "ddgs", "timelimit": ""})
+    client.post("/search", data={"text": "wiki", "provider": "wikipedia"})
+    body = client.get("/").text
+
+    # "any" now appears only in the Time column — the engine column lists its
+    # engines instead of summarising them, so the word has one meaning again.
+    assert ">any<" in body      # ddgs: supports a window, none chosen
+    assert "&mdash;" in body    # wikipedia: no window to choose
+
+
+def test_provider_controls_are_hidden_by_generated_css(client):
+    """The visibility rules come from the same matrix the server enforces, so a
+    control can never be offered for an option the server would discard."""
+    body = client.get("/").text
+
+    assert ".sentence:has(#pv-wikipedia:checked) .opt-timelimit" in body
+    assert ".sentence:has(#pv-openalex:checked) .opt-region" in body
+    # ddgs applies every option, so it hides nothing.
+    assert ".sentence:has(#pv-ddgs:checked)" not in body
 
 
 def test_query_text_is_escaped(client):

@@ -26,21 +26,23 @@ DEFAULT_DB = DATA_DIR / "t2url.db"
 # Column order here must match the Iceberg DDL. Kept explicit rather than
 # SELECT * so a schema change fails loudly instead of silently misaligning.
 SEARCH_COLUMNS = [
-    "search_id", "query", "created_at", "region",
+    "search_id", "query", "created_at", "provider", "region",
     "safesearch", "timelimit", "backend", "max_results",
 ]
-URL_COLUMNS = ["search_id", "position", "url", "created_at"]
+URL_COLUMNS = ["search_id", "position", "url", "provider", "created_at"]
 
 SEARCH_QUERY = """
-    SELECT id AS search_id, query, created_at, region,
+    SELECT id AS search_id, query, created_at, provider, region,
            safesearch, timelimit, backend, max_results
       FROM searches
      WHERE created_at > ?
      ORDER BY id
 """
 
+# `provider` comes off search_urls rather than the join, so a row carries its own
+# provenance into the lakehouse instead of depending on the parent surviving.
 URL_QUERY = """
-    SELECT u.search_id, u.position, u.url, s.created_at
+    SELECT u.search_id, u.position, u.url, u.provider, s.created_at
       FROM search_urls u
       JOIN searches s ON s.id = u.search_id
      WHERE s.created_at > ?

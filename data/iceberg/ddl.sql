@@ -23,10 +23,11 @@ CREATE TABLE IF NOT EXISTS t2url.raw_searches (
     search_id     BIGINT   COMMENT 'Matches searches.id in the SQLite dev store',
     query         STRING   COMMENT 'The natural-language text the user submitted',
     created_at    TIMESTAMP COMMENT 'UTC. Source of truth for partitioning.',
-    region        STRING   COMMENT 'Locale code, e.g. wt-wt, us-en, kr-kr',
-    safesearch    STRING   COMMENT 'off | moderate | on',
-    timelimit     STRING   COMMENT 'NULL (any time) | d | w | m | y',
-    backend       STRING   COMMENT 'Comma-delimited engine fallback chain as submitted',
+    provider      STRING   COMMENT 'Corpus searched: ddgs | wikipedia | openalex | arxiv',
+    region        STRING   COMMENT 'Locale code (ddgs) or language edition (wikipedia). NULL = provider does not support it',
+    safesearch    STRING   COMMENT 'off | moderate | on. NULL = provider does not support it',
+    timelimit     STRING   COMMENT 'd | w | m | y. "" = supported but unused, NULL = provider does not support it',
+    backend       STRING   COMMENT 'Comma-delimited engines ASKED (ddgs only). Not which engine answered - ddgs does not report that',
     max_results   INT      COMMENT 'Result ceiling requested, 1-50',
     ingested_at   TIMESTAMP COMMENT 'When this row reached the lakehouse'
 )
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS t2url.raw_search_urls (
     search_id     BIGINT   COMMENT 'FK to raw_searches.search_id',
     position      INT      COMMENT 'Rank order as returned by the engine, 0-based',
     url           STRING   COMMENT 'Result URL. Links only - never page content.',
+    provider      STRING   COMMENT 'Corpus that returned this URL, denormalised from the parent search',
     created_at    TIMESTAMP COMMENT 'Denormalised from the parent search for partitioning',
     ingested_at   TIMESTAMP COMMENT 'When this row reached the lakehouse'
 )
@@ -77,6 +79,7 @@ CREATE TABLE IF NOT EXISTS t2url.curated_urls (
     times_seen      INT     COMMENT 'How many distinct searches returned it',
     best_position   INT     COMMENT 'Best (lowest) rank achieved across those searches',
     search_ids      ARRAY<BIGINT> COMMENT 'Every search that returned this URL',
+    providers       ARRAY<STRING> COMMENT 'Every corpus that returned this URL. More than one entry means independent corroboration',
     processed_at    TIMESTAMP COMMENT 'When the enrichment job last wrote this row'
 )
 USING iceberg

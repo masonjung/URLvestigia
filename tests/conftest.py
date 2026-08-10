@@ -47,6 +47,31 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip)
 
 
+@pytest.fixture(autouse=True)
+def no_network(request, monkeypatch):
+    """Make "no network in the default run" structural rather than conventional.
+
+    Every provider reaches the outside world through `providers._get_bytes`, so
+    severing that one function severs all of them. Before the provider seam the
+    rule held only because each test remembered to install a fake `DDGS`; a
+    provider that forgot would have started making real calls in CI, and the
+    symptom would have been a slow, flaky suite rather than an obvious failure.
+
+    Live tests opt back in through the `live` marker.
+    """
+    if "live" in request.keywords:
+        return
+
+    import providers
+
+    def blocked(url, params):
+        raise AssertionError(
+            f"test tried to reach the network: {url}. Stub the provider, or mark "
+            f"the test @pytest.mark.live if it is meant to call out.")
+
+    monkeypatch.setattr(providers, "_get_bytes", blocked)
+
+
 @pytest.fixture
 def temp_db(tmp_path, monkeypatch):
     """A fresh, initialised SQLite store scoped to one test.

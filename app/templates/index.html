@@ -137,9 +137,25 @@
       .sentence select:focus,
       .sentence input[type="number"]:focus { outline: none; border-color: var(--focus); }
 
-      /* Engine toggles: pill chips that fill when active */
+      /* Each control keeps its own connective word, so hiding one takes the
+         preposition with it and the sentence still reads. */
+      .opt { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; }
+
+      /* Which controls a provider hides, generated from the support matrix in
+         ai/providers.py via app/server.py:_providers(). Written here rather than
+         hand-maintained because a rule that disagrees with the server would show a
+         knob that silently does nothing — the exact failure the matrix prevents.
+
+         Hiding is cosmetic only: a hidden control still posts its value, so the
+         server remains the enforcement point. Where :has() is unsupported every
+         control simply renders, which is safe for the same reason. */
+      {% for p in providers %}{% for opt in p.unsupported %}
+      .sentence:has(#pv-{{ p.id }}:checked) .opt-{{ opt }} { display: none; }
+      {% endfor %}{% endfor %}
+
+      /* Engine and provider toggles: pill chips that fill when active */
       .engines { display: inline-flex; flex-wrap: wrap; gap: 0.45rem; }
-      .engines input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+      .engines input { position: absolute; opacity: 0; pointer-events: none; }
       .engines label {
         font-size: 0.84rem; font-weight: 500; color: var(--muted);
         padding: 0.32rem 0.85rem;
@@ -301,40 +317,53 @@
           required
         ></textarea>
         <p class="sentence">
-          Search with
+          Search
           <span class="engines">
-            <input type="checkbox" id="be-ddg" name="backend" value="duckduckgo" checked /><label for="be-ddg">DuckDuckGo</label>
-            <input type="checkbox" id="be-yah" name="backend" value="yahoo" /><label for="be-yah">Yahoo</label>
-            <input type="checkbox" id="be-sta" name="backend" value="startpage" /><label for="be-sta">Startpage</label>
-            <input type="checkbox" id="be-yan" name="backend" value="yandex" /><label for="be-yan">Yandex</label>
+            {% for p in providers %}<input type="radio" id="pv-{{ p.id }}" name="provider" value="{{ p.id }}"{% if loop.first %} checked{% endif %} /><label for="pv-{{ p.id }}">{{ p.label }}</label>
+            {% endfor %}
+          </span>
+          <span class="opt opt-backend">
+            via
+            <span class="engines">
+              <input type="checkbox" id="be-ddg" name="backend" value="duckduckgo" checked /><label for="be-ddg">DuckDuckGo</label>
+              <input type="checkbox" id="be-yah" name="backend" value="yahoo" /><label for="be-yah">Yahoo</label>
+              <input type="checkbox" id="be-sta" name="backend" value="startpage" /><label for="be-sta">Startpage</label>
+              <input type="checkbox" id="be-yan" name="backend" value="yandex" /><label for="be-yan">Yandex</label>
+            </span>
           </span>
           for up to
           <input type="number" name="max_results" value="10" min="1" max="50" aria-label="Max results" />
-          URLs from
-          <select name="timelimit" aria-label="Time range">
-            <option value="" selected>any time</option>
-            <option value="d">the past day</option>
-            <option value="w">the past week</option>
-            <option value="m">the past month</option>
-            <option value="y">the past year</option>
-          </select>
-          in
-          <select name="region" aria-label="Region">
-            <option value="wt-wt" selected>Worldwide</option>
-            <option value="us-en">the US</option>
-            <option value="uk-en">the UK</option>
-            <option value="kr-kr">Korea</option>
-            <option value="jp-jp">Japan</option>
-            <option value="de-de">Germany</option>
-            <option value="fr-fr">France</option>
-          </select>
-          with
-          <select name="safesearch" aria-label="SafeSearch">
-            <option value="off">off</option>
-            <option value="moderate" selected>moderate</option>
-            <option value="on">on</option>
-          </select>
-          safe search.
+          URLs
+          <span class="opt opt-timelimit">
+            from
+            <select name="timelimit" aria-label="Time range">
+              <option value="" selected>any time</option>
+              <option value="d">the past day</option>
+              <option value="w">the past week</option>
+              <option value="m">the past month</option>
+              <option value="y">the past year</option>
+            </select>
+          </span>
+          <span class="opt opt-region">
+            in
+            <select name="region" aria-label="Region">
+              <option value="wt-wt" selected>Worldwide</option>
+              <option value="us-en">the US</option>
+              <option value="uk-en">the UK</option>
+              <option value="kr-kr">Korea</option>
+              <option value="jp-jp">Japan</option>
+              <option value="de-de">Germany</option>
+              <option value="fr-fr">France</option>
+            </select>
+          </span>
+          <span class="opt opt-safesearch">
+            with
+            <select name="safesearch" aria-label="SafeSearch">
+              <option value="off">off</option>
+              <option value="moderate" selected>moderate</option>
+              <option value="on">on</option>
+            </select>
+            safe search</span>.
         </p>
         <div class="actions">
           <button type="submit">Search</button>
@@ -367,6 +396,7 @@
               <th>#</th>
               <th>Question</th>
               <th class="col-urls">URLs</th>
+              <th class="col-opt">Provider</th>
               <th class="col-opt">Time</th>
               <th class="col-opt">Engine</th>
               <th class="col-opt">Region</th>
@@ -388,7 +418,10 @@
                   {% endfor %}
                 </div>
               </td>
-              <td class="col-opt">{% if row.backend %}{{ row.timelimit or "any" }}{% else %}&mdash;{% endif %}</td>
+              <td class="col-opt">{{ row.provider_label or "&mdash;" | safe }}</td>
+              {# NULL means the provider has no time filter; "" means it has one and
+                 the search did not use it. The dash and "any" are not the same claim. #}
+              <td class="col-opt">{% if row.timelimit is none %}&mdash;{% else %}{{ row.timelimit or "any" }}{% endif %}</td>
               <td class="col-opt col-engine">{{ row.backend_label or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.region or "&mdash;" | safe }}</td>
               <td class="col-opt">{{ row.safesearch or "&mdash;" | safe }}</td>
@@ -401,7 +434,7 @@
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="10" class="empty">No searches yet — run one above.</td></tr>
+            <tr><td colspan="11" class="empty">No searches yet — run one above.</td></tr>
             {% endfor %}
           </tbody>
         </table>

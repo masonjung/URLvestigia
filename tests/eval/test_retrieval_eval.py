@@ -25,6 +25,10 @@ import t2url
 
 ENGINES = ["duckduckgo", "yahoo", "startpage", "yandex"]
 
+# Every corpus the UI offers. These are an axis, not links in the `backend` chain:
+# a web-search miss must not fall through to arXiv and answer with preprints.
+PROVIDERS = ["ddgs", "wikipedia", "openalex", "arxiv"]
+
 # A search that takes longer than this is unusable behind a synchronous form
 # post, whatever it returns.
 LATENCY_BUDGET_S = 20.0
@@ -50,11 +54,29 @@ def assert_retrieval_contract(urls, max_results):
 class TestRetrievalContract:
     @pytest.fixture
     def stub(self, monkeypatch):
+        """Install a canned ddgs response.
+
+        See `provider_stub` for the seam that covers every provider; this one stays
+        ddgs-shaped because the contract cases below are written against real ddgs
+        payloads, including the `href`/`url` rename and the entries missing a URL.
+        """
         def _install(results):
             class Fake:
                 def text(self, query, **kwargs):
                     return results
             monkeypatch.setattr(t2url, "DDGS", Fake)
+        return _install
+
+    @pytest.fixture
+    def provider_stub(self, monkeypatch):
+        """Replace a provider in the registry with one returning fixed URLs.
+
+        Patching the registry rather than a provider's internals is what lets the
+        contract tier cover every corpus through one mechanism — and what stops a
+        provider added later from quietly escaping it.
+        """
+        def _install(provider, urls):
+            monkeypatch.setitem(t2url.REGISTRY, provider, lambda text, **kw: urls)
         return _install
 
     def test_wellformed_response_satisfies_the_contract(self, stub, fake_results):
@@ -96,6 +118,28 @@ class TestRetrievalContract:
     def test_full_chain_is_accepted(self, stub):
         stub([{"href": "https://example.com/1"}])
         assert t2url.text_to_urls("cdp", backend=",".join(ENGINES))
+
+    @pytest.mark.parametrize("provider", PROVIDERS)
+    def test_every_ui_provider_satisfies_the_contract(self, provider_stub, provider):
+        """The contract is a property of retrieval, not of ddgs. Every corpus makes
+        the same six promises, so the Serve layer and the lakehouse can treat their
+        output identically."""
+        provider_stub(provider, ["https://example.com/1", "https://example.com/1",
+                                 "https://example.com/2"])
+        urls = t2url.text_to_urls("cdp", provider=provider, max_results=10)
+
+        assert_retrieval_contract(urls, 10)
+        assert urls == ["https://example.com/1", "https://example.com/2"]
+
+    @pytest.mark.parametrize("provider", PROVIDERS)
+    def test_max_results_is_capped_for_every_provider(self, provider_stub, provider):
+        """ddgs enforces its own ceiling; an API asked for 3 may still return more.
+        The cap is re-applied centrally so the guarantee does not depend on each
+        provider being well-behaved."""
+        provider_stub(provider, [f"https://example.com/{i}" for i in range(20)])
+        urls = t2url.text_to_urls("cdp", provider=provider, max_results=3)
+
+        assert_retrieval_contract(urls, 3)
 
 
 # --- Live tier (--live only) -----------------------------------------------
@@ -154,3 +198,28 @@ class TestLiveRetrieval:
         assert_retrieval_contract(urls, 10)
         if not urls:
             pytest.skip(f"{engine} returned nothing — throttled or blocked")
+
+    @pytest.mark.parametrize("provider", PROVIDERS)
+    def test_provider_availability(self, provider):
+        """The measurement this whole change was made for.
+
+        The three API providers are expected to answer from anywhere, including a
+        datacenter IP, while `ddgs` is the one that may be blocked. If that pattern
+        ever inverts, the argument for the API providers has weakened and belongs
+        in the model card. A skip here is a recorded observation, not a pass."""
+        urls = t2url.text_to_urls("apache iceberg", max_results=10, provider=provider)
+
+        assert_retrieval_contract(urls, 10)
+        if not urls:
+            pytest.skip(f"{provider} returned nothing — throttled or blocked")
+
+    def test_wikipedia_region_selects_the_language_edition(self):
+        """`region` has to mean something real per provider, or the per-provider
+        controls are decoration. Korean must return the Korean edition."""
+        urls = t2url.text_to_urls("아파치 아이스버그", max_results=5,
+                                  provider="wikipedia", region="kr-kr")
+
+        assert_retrieval_contract(urls, 5)
+        if not urls:
+            pytest.skip("wikipedia returned nothing — throttled or blocked")
+        assert all(url.startswith("https://ko.wikipedia.org/") for url in urls)

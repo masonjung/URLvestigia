@@ -29,24 +29,47 @@ def init_db():
         # Migrate DBs created before the settings columns existed.
         cols = {row["name"] for row in conn.execute("PRAGMA table_info(searches)")}
         for col, sqltype in (("region", "TEXT"), ("safesearch", "TEXT"), ("timelimit", "TEXT"),
-                             ("backend", "TEXT"), ("max_results", "INTEGER")):
+                             ("backend", "TEXT"), ("max_results", "INTEGER"),
+                             ("provider", "TEXT")):
             if col not in cols:
                 conn.execute(f"ALTER TABLE searches ADD COLUMN {col} {sqltype}")
+        url_cols = {row["name"] for row in conn.execute("PRAGMA table_info(search_urls)")}
+        if "provider" not in url_cols:
+            conn.execute("ALTER TABLE search_urls ADD COLUMN provider TEXT")
+            # Backfill from the parent search. Rows predating the provider seam
+            # leave it NULL on both tables, which is the honest answer.
+            conn.execute(
+                "UPDATE search_urls SET provider ="
+                " (SELECT provider FROM searches WHERE searches.id = search_urls.search_id)"
+            )
 
 
-def save_search(query, urls, *, region=None, safesearch=None, timelimit=None,
-                backend=None, max_results=None):
+def save_search(query, urls, *, provider=None, region=None, safesearch=None,
+                timelimit=None, backend=None, max_results=None):
+    """Persist one search and its ordered URLs.
+
+    On the settings arguments, None and "" mean different things and callers must
+    keep them apart:
+
+    * ``None`` — this provider does not support the option. Stored NULL.
+    * ``""``   — supported, left unset by the user (ddgs with "any time").
+    * a value  — supported and applied.
+
+    Collapsing the first two would record a filter that never ran, which is the one
+    thing a governed, reproducible search record must not do.
+    """
     with _db() as conn:
         cur = conn.execute(
             "INSERT INTO searches"
-            " (query, created_at, region, safesearch, timelimit, backend, max_results)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            " (query, created_at, provider, region, safesearch, timelimit, backend, max_results)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (query, datetime.now(timezone.utc).isoformat(),
-             region, safesearch, timelimit, backend, max_results),
+             provider, region, safesearch, timelimit, backend, max_results),
         )
         conn.executemany(
-            "INSERT INTO search_urls (search_id, position, url) VALUES (?, ?, ?)",
-            [(cur.lastrowid, i, url) for i, url in enumerate(urls)],
+            "INSERT INTO search_urls (search_id, position, url, provider)"
+            " VALUES (?, ?, ?, ?)",
+            [(cur.lastrowid, i, url, provider) for i, url in enumerate(urls)],
         )
         return cur.lastrowid
 
@@ -55,7 +78,8 @@ def list_searches(limit=50):
     """Recent searches, newest first, each with its ordered URLs."""
     with _db() as conn:
         rows = conn.execute(
-            "SELECT id, query, created_at, region, safesearch, timelimit, backend, max_results"
+            "SELECT id, query, created_at, provider, region, safesearch, timelimit,"
+            " backend, max_results"
             " FROM searches ORDER BY id DESC LIMIT ?",
             (limit,),
         ).fetchall()
@@ -63,6 +87,7 @@ def list_searches(limit=50):
             "id": r["id"],
             "query": r["query"],
             "created_at": r["created_at"],
+            "provider": r["provider"],
             "region": r["region"],
             "safesearch": r["safesearch"],
             "timelimit": r["timelimit"],
@@ -97,6 +122,14 @@ def dedupe_urls():
     """Delete duplicate URLs across searches, keeping the earliest occurrence.
 
     Searches left with no URLs are removed too. Returns the number of URL rows deleted.
+
+    Note this is lossy for provenance now that URLs carry a `provider`: a page
+    returned by both a web search and Wikipedia keeps only the earlier row, so
+    the other provider's sighting is discarded. That is fine locally — this is
+    a dev-store convenience, and the lakehouse path keeps every sighting and
+    aggregates them into `curated_urls.providers` instead of deleting. Expect
+    the collision rate to rise as more providers are used, since encyclopedia
+    and scholarly results do surface on the open web too.
     """
     with _db() as conn:
         cur = conn.execute(

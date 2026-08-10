@@ -11,11 +11,15 @@ all five layers of the reference stack.
    "cloudera     │             FastAPI + Jinja2, no JavaScript │
     cdp use      └────────────────┬────────────────────────────┘
     cases"                        │
-                 ┌────────────────▼────────────────────────────┐
-                 │  AI         ai/t2url.py                     │ ──► DuckDuckGo
-                 │             text_to_urls()  via ddgs        │     Yahoo
-                 └────────────────┬────────────────────────────┘     Startpage
-                                  │ URLs, deduped, rank order        Yandex
+                 ┌────────────────▼────────────────────────────┐     one provider
+                 │  AI         ai/t2url.py                     │     per search
+                 │             text_to_urls()                  │ ──► ddgs ─► DuckDuckGo
+                 │             ai/providers.py                 │     │       Yahoo
+                 │             one corpus per search           │     │       Startpage
+                 └────────────────┬────────────────────────────┘     │       Yandex
+                                  │ URLs, deduped, rank order        ├─► Wikipedia
+                                  │                                  ├─► OpenAlex
+                                  │                                  └─► arXiv
                  ┌────────────────▼────────────────────────────┐
                  │  INGEST     data/db.py        (SQLite, dev) │
                  │             data/ingest/      (→ Iceberg)   │
@@ -52,10 +56,14 @@ A search is synchronous and touches three layers:
 
 1. **`POST /search`** — `app/server.py` whitelists every option against `OPTIONS`,
    clamps `max_results` to 1–50, and joins the checked engines into a fallback chain.
-2. **Retrieval** — `t2url.text_to_urls()` calls `ddgs`, which queries engines in
-   order until it has enough results. Returns URLs deduplicated, in rank order.
-3. **Persist** — `db.save_search()` writes the query, its full option set, and the
-   URLs in one transaction.
+2. **Retrieval** — `t2url.text_to_urls()` dispatches to the selected provider,
+   dropping any option that provider does not apply. `ddgs` queries web engines in
+   order until it has enough results; the others call one API. Returns URLs
+   deduplicated, in rank order.
+3. **Persist** — `db.save_search()` writes the query, the provider, the options that
+   were actually applied, and the URLs in one transaction. An option the provider
+   does not support is stored `NULL`, distinct from `""` for one it supports and the
+   search did not use.
 4. **303 redirect** back to `/` with a flash message. Reloading never re-runs a
    search.
 
@@ -75,10 +83,63 @@ Discover → Qualify demo loop short, which is worth more here than a richer UI.
 cost is real — no incremental updates, a full page render per action — and the
 swap path is documented in [`app/README.md`](../app/README.md).
 
-**Multi-engine is resilience, not a merge.** `ddgs` tries engines in order and stops
-once it has `max_results`. A throttled engine falls through instead of failing the
-search. Order is load-bearing; measure it with `ai/notebooks/retrieval_eval.ipynb`
-before changing it.
+**Multi-engine is resilience, and its mechanics are ddgs's, not ours.** Selecting
+several engines makes a throttled one survivable rather than fatal — that part holds,
+and it is the reason to select more than one.
+
+This document previously said ddgs "tries engines in order and stops once it has
+`max_results`," with order load-bearing. **That is not what ddgs 9.x does**, and the
+correction matters because it changes what the `backend` column can be claimed to
+mean. Reading `ddgs/ddgs.py` and probing the live library:
+
+- Engines are submitted to a `ThreadPoolExecutor` **concurrently**, not tried in
+  sequence. `max_workers = min(unique_engines, ceil(max_results / 10) + 1)`, so at
+  `max_results=10` two engines are queried at once.
+- Results from whichever engines return are pooled in a `ResultsAggregator` and
+  re-ranked together by ddgs's own `SimpleFilterRanker`. Order of selection is a
+  weak input to that, not a priority chain.
+- Engines that do not finish inside the first `wait()` appear to have their results
+  dropped. Observed: `yahoo` alone returned 7 URLs, `startpage` alone returned 10,
+  and `yahoo,startpage` returned **7** — the chain neither filled to `max_results`
+  nor merged in what startpage had.
+
+Two consequences the rest of this repo depends on. First, **`backend` records the
+engines *asked*, not the engine that answered** — see the note under *Providers are
+an axis*. Second, selecting more engines is not free extra coverage; measure it with
+`ai/notebooks/retrieval_eval.ipynb` rather than assuming.
+
+**Providers are an axis, not links in the chain.** The decision above is why
+Wikipedia, OpenAlex, and arXiv are a separate choice rather than four more entries
+in `backend`. Fall-through assumes the engines are substitutes for one another;
+these are different corpora, so a web-search miss falling through to arXiv would
+answer a product question with physics preprints and look like a successful search.
+Near-zero overlap is exactly what makes them worth adding *and* what disqualifies
+them as fallbacks. One search therefore uses one provider, recorded on the row.
+
+Merging results across providers is a different feature, not a smaller version of
+this one: it needs a defensible meaning for `max_results` across corpora, and
+concurrency to stay inside the 20 s budget the synchronous form post allows. It
+would supersede this decision, so it needs an ADR rather than a patch.
+
+**Provenance resolves to the corpus, not the engine.** `raw_search_urls.provider`
+records which corpus returned each URL, and `curated_urls.providers` accumulates
+every corpus that returned it — a URL with more than one entry was found
+independently, which is a stronger signal than the same URL twice from one engine.
+
+There is deliberately **no per-URL engine column**. ddgs pools results from several
+engines into one list and discards which engine produced each row, so any such value
+would be invented rather than recorded. Getting it truthfully would mean querying
+each engine separately and attributing the results here — replacing ddgs's
+aggregation and ranking with ours, at N× the latency. That is the same merge decision
+above, and it needs the same ADR.
+
+**A provider only advertises options it applies.** The support matrix in
+`ai/providers.py` is declared once and drives four things: which kwargs reach the
+provider, which columns are written versus left `NULL`, which controls the template
+renders, and the CSS that hides the rest. Restating it anywhere would let the copies
+drift, and the symptom would be a control that silently does nothing. With no
+JavaScript a hidden control still posts its value, so the CSS is presentation only
+and `app/server.py` remains the enforcement point.
 
 **The Process layer normalises; the local dedupe does not.** `db.dedupe_urls()`
 compares raw strings. The Spark job strips `www.`, tracking parameters, and
@@ -87,9 +148,17 @@ fragments first, then aggregates rather than deletes — duplicates are signal
 aggressive, never less, and
 [`tests/data_quality/`](../tests/data_quality/test_url_normalization.py) asserts it.
 
-**Links only, never page content.** Enforced structurally: there is no HTTP client
-anywhere in this repo that fetches a result page. `ai/t2url.py` reads `href` and
-discards the rest. Adding a fetcher is a classification change, not a feature.
+**Links only, never page content.** Enforced structurally: no HTTP client in this
+repo fetches the content of a result URL. Retrieval reads the URL out of each result
+and discards the rest — including the snippets and abstracts the API providers
+return. `ai/providers.py` has exactly one outbound seam, `_get_bytes`, and it calls
+search and metadata APIs only. Pointing it at a result URL is a classification
+change, not a feature — see
+[`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md).
+
+That single seam is also what makes the rule testable: `tests/conftest.py` severs it
+for the whole suite, so "no network in the default run" is enforced rather than
+remembered.
 
 ## Where the layering is tested
 

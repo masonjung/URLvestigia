@@ -1,11 +1,20 @@
 """t2url — natural-language text in, a list of URLs out, via free web search.
 
-Free to run: no API keys, no accounts — searches go to the engines' public
-pages through the ddgs metasearch library. Persistence lives in
-03_Database/db.py; this module is search only.
+Free to run: no API keys, no accounts. Web searches go to the engines' public pages
+through the ddgs metasearch library; Wikipedia, OpenAlex, and arXiv are reached
+through their own keyless APIs in providers.py. Persistence lives in data/db.py;
+this module is search only.
+
+One search uses one provider. Within `ddgs`, `backend` is still a fallback chain —
+engines tried in order until `max_results` is filled. Across providers there is no
+chain, because they are different corpora: falling through from a web engine to
+arXiv would answer a web-search miss with physics preprints.
 """
 
 from ddgs import DDGS
+
+import providers
+from providers import SUPPORTS
 
 # ddgs search options:
 # region: locale like "us-en", "kr-kr"; "wt-wt" for worldwide.
@@ -15,16 +24,17 @@ from ddgs import DDGS
 #             e.g. "duckduckgo" or "duckduckgo,yahoo,startpage,yandex"; with a list,
 #             ddgs stops as soon as it has max_results, falling through on failures.
 #             (ddgs also supports google, brave, mojeek, wikipedia, but they are
-#             blocked or empty too often from this network to expose in the UI.)
+#             blocked or empty too often from this network to expose in the UI.
+#             Wikipedia is exposed as its own provider instead, via the MediaWiki
+#             API, because the ddgs backend cannot map a region to a language.)
 # max_results: max number of results. If None, returns results only from the first response.
 
+DEFAULT_PROVIDER = "ddgs"
 
-def text_to_urls(text, *, max_results=10, region="wt-wt", safesearch="moderate",
+
+def _search_ddgs(text, *, max_results, region="wt-wt", safesearch="moderate",
                  timelimit=None, backend="duckduckgo"):
-    """Natural-language text -> result URLs, deduplicated, in rank order."""
-    text = text.strip()
-    if not text:
-        return []
+    """Web results through the ddgs metasearch library."""
     results = DDGS().text(
         text,
         region=region,
@@ -33,9 +43,52 @@ def text_to_urls(text, *, max_results=10, region="wt-wt", safesearch="moderate",
         backend=backend,
         max_results=max_results,
     )
+    # ddgs renamed "url" to "href"; accept either so a library upgrade cannot
+    # silently return zero results.
+    return [item.get("href") or item.get("url") for item in results or []]
+
+
+# Provider id -> search function. ddgs is a library call and stays here; the HTTP
+# providers live in providers.py.
+REGISTRY = {DEFAULT_PROVIDER: _search_ddgs, **providers.REGISTRY}
+
+
+def supports(provider):
+    """The option names `provider` actually applies.
+
+    Callers use this to avoid recording an option that was never applied. A
+    Wikipedia search stamped `timelimit="w"` would be a false claim in a governed
+    table, and the whole point of persisting the options is that a search can be
+    reproduced from them.
+    """
+    return SUPPORTS.get(provider, frozenset())
+
+
+def text_to_urls(text, *, provider=DEFAULT_PROVIDER, max_results=10, region="wt-wt",
+                 safesearch="moderate", timelimit=None, backend="duckduckgo"):
+    """Natural-language text -> result URLs, deduplicated, in rank order.
+
+    Options a provider does not support are dropped rather than passed and ignored,
+    so a provider can never be handed a filter it would silently discard.
+    """
+    text = text.strip()
+    if not text:
+        return []
+
+    search = REGISTRY.get(provider) or REGISTRY[DEFAULT_PROVIDER]
+    options = {
+        "region": region,
+        "safesearch": safesearch,
+        "timelimit": timelimit or None,
+        "backend": backend,
+    }
+    applied = {name: value for name, value in options.items()
+               if name in supports(provider)}
+
     urls = []
-    for item in results or []:
-        url = item.get("href") or item.get("url")  # ddgs renamed "url" to "href"
+    for url in search(text, max_results=max_results, **applied) or []:
         if url and url not in urls:
             urls.append(url)
-    return urls
+    # ddgs enforces its own ceiling; the API providers are asked for max_results but
+    # the cap is re-applied here so the guarantee holds however a provider behaves.
+    return urls[:max_results]

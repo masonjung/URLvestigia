@@ -89,10 +89,23 @@ USING staged_urls AS source
       target.best_position = LEAST(target.best_position, source.best_position),
       target.search_ids    = array_distinct(
                                  concat(target.search_ids, source.search_ids)),
+      target.providers     = array_distinct(
+                                 concat(target.providers, source.providers)),
       target.processed_at  = source.processed_at
  WHEN NOT MATCHED THEN INSERT *
 """
 
+# Column order must match curated_urls in data/iceberg/ddl.sql — `INSERT *`
+# binds positionally, so a reordering here misaligns silently.
+#
+# `providers` accumulates rather than collapses: unlike db.dedupe_urls(), which
+# keeps one row and discards the other sighting, the lakehouse keeps every
+# sighting and records which corpora produced it. A URL with more than one entry
+# was found independently by more than one corpus, which is a stronger signal
+# than the same URL twice from one engine.
+#
+# collect_list drops NULLs, so rows ingested before per-URL provenance existed
+# contribute an empty array rather than a fabricated value.
 STAGE_SQL = """
 SELECT url,
        domain,
@@ -103,6 +116,7 @@ SELECT url,
        COUNT(DISTINCT search_id) AS times_seen,
        MIN(position)            AS best_position,
        array_distinct(collect_list(search_id)) AS search_ids,
+       array_distinct(collect_list(provider))  AS providers,
        current_timestamp()      AS processed_at
   FROM normalised
  WHERE url IS NOT NULL AND domain IS NOT NULL
@@ -148,7 +162,7 @@ def run(args):
     normalised = (
         raw.withColumn("url", norm_udf(F.col("url")))
            .withColumn("_p", parts_udf(F.col("url")))
-           .select("search_id", "position", "url", "created_at",
+           .select("search_id", "position", "url", "provider", "created_at",
                    F.col("_p.domain").alias("domain"),
                    F.col("_p.tld").alias("tld"),
                    F.col("_p.scheme").alias("scheme"))
@@ -179,7 +193,8 @@ def print_plan(args):
     print("transform")
     print("  1. normalize_url()  lowercase host, strip www./tracking params/fragment")
     print("  2. url_parts()      derive domain, tld, scheme")
-    print("  3. group by url     first_seen, last_seen, times_seen, best_position\n")
+    print("  3. group by url     first_seen, last_seen, times_seen, best_position")
+    print("  4. collect          search_ids, providers (every corpus that found it)\n")
 
     sample = "https://WWW.Example.com/Docs/?utm_source=news&topic=iceberg#intro"
     print(f"normalisation sample\n  in   {sample}\n  out  {normalize_url(sample)}\n")
