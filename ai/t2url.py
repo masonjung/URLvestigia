@@ -12,6 +12,7 @@ arXiv would answer a web-search miss with physics preprints.
 """
 
 from ddgs import DDGS
+from ddgs.exceptions import DDGSException
 
 import providers
 from providers import SUPPORTS
@@ -31,18 +32,35 @@ from providers import SUPPORTS
 
 DEFAULT_PROVIDER = "ddgs"
 
+# ddgs signals "every engine answered, none had anything" by raising rather than
+# returning an empty list, with this exact message. Matching on the string is
+# unlovely, but it is the only signal the library exposes: the alternative is
+# reporting an ordinary empty result set to the user as a hard error, in red, next
+# to the app's own "No results found." saying the opposite. If a future ddgs
+# reworded it, this stops matching and the behaviour reverts to what it is today.
+_DDGS_EMPTY = "No results found."
+
 
 def _search_ddgs(text, *, max_results, region="wt-wt", safesearch="moderate",
                  timelimit=None, backend="duckduckgo"):
-    """Web results through the ddgs metasearch library."""
-    results = DDGS().text(
-        text,
-        region=region,
-        safesearch=safesearch,
-        timelimit=timelimit or None,
-        backend=backend,
-        max_results=max_results,
-    )
+    """Web results through the ddgs metasearch library.
+
+    An empty result comes back as `[]`. A genuine failure — rate limited, blocked,
+    transport error — is left to propagate, because those the caller must report.
+    """
+    try:
+        results = DDGS().text(
+            text,
+            region=region,
+            safesearch=safesearch,
+            timelimit=timelimit or None,
+            backend=backend,
+            max_results=max_results,
+        )
+    except DDGSException as exc:
+        if str(exc) == _DDGS_EMPTY:
+            return []
+        raise
     # ddgs renamed "url" to "href"; accept either so a library upgrade cannot
     # silently return zero results.
     return [item.get("href") or item.get("url") for item in results or []]

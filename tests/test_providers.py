@@ -11,10 +11,17 @@ produce a bare identifier where the retrieval contract demands an absolute URL.
 """
 
 import json
+import urllib.error
 
 import providers
 import pytest
 import t2url
+from ddgs.exceptions import DDGSException
+
+# Captured at import, before conftest's `no_network` fixture replaces the attribute.
+# That is what lets the retry policy *inside* `_get_bytes` be exercised while the
+# network stays severed: the fake goes on `_request_once`, one level below it.
+_REAL_GET_BYTES = providers._get_bytes
 
 WIKIPEDIA_PAYLOAD = {
     "query": {"search": [
@@ -278,6 +285,61 @@ class TestTheNetworkGuard:
                 search("iceberg", max_results=1)
 
 
+class TestTheHttpRetry:
+    """One retry, and only for the failures a second attempt can fix.
+
+    arXiv's export API can take longer than the timeout to answer a query it has not
+    served recently, which used to reach the user as a bare "The read operation timed
+    out" and lose the search.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_backoff(self, monkeypatch):
+        monkeypatch.setattr(providers, "HTTP_RETRY_WAIT_S", 0)
+
+    def test_a_timeout_is_retried(self, monkeypatch):
+        attempts = []
+
+        def flaky(url, params):
+            attempts.append(url)
+            if len(attempts) == 1:
+                raise TimeoutError("The read operation timed out")
+            return b"{}"
+
+        monkeypatch.setattr(providers, "_request_once", flaky)
+
+        assert _REAL_GET_BYTES("https://example.org", {}) == b"{}"
+        assert len(attempts) == 2
+
+    def test_it_gives_up_at_the_attempt_ceiling(self, monkeypatch):
+        """The retry must not become an unbounded loop against a dead endpoint."""
+        attempts = []
+
+        def always_times_out(url, params):
+            attempts.append(url)
+            raise TimeoutError("The read operation timed out")
+
+        monkeypatch.setattr(providers, "_request_once", always_times_out)
+
+        with pytest.raises(TimeoutError):
+            _REAL_GET_BYTES("https://example.org", {})
+        assert len(attempts) == providers.HTTP_ATTEMPTS
+
+    def test_an_http_error_is_not_retried(self, monkeypatch):
+        """A 404 is a real answer — asking again returns the same one, slower."""
+        attempts = []
+
+        def not_found(url, params):
+            attempts.append(url)
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+        monkeypatch.setattr(providers, "_request_once", not_found)
+
+        with pytest.raises(urllib.error.HTTPError):
+            _REAL_GET_BYTES("https://example.org", {})
+        assert len(attempts) == 1
+
+
 class TestUserAgent:
     def test_contact_is_included_when_set(self, monkeypatch):
         monkeypatch.setenv("T2URL_CONTACT", "team@example.com")
@@ -326,3 +388,34 @@ class TestUnsupportedOptionsNeverReachAProvider:
         monkeypatch.setattr(t2url, "DDGS", FakeDDGS)
         assert t2url.text_to_urls("iceberg", provider="evilcorp") == [
             "https://example.com/1"]
+
+
+# --- ddgs's empty result --------------------------------------------------
+
+class TestDdgsEmptyResults:
+    """ddgs signals "nothing found" by raising, so the empty case has to be told
+    apart from a real failure here — otherwise an ordinary miss reaches the user as
+    a red error contradicting the app's own "No results found." message."""
+
+    @staticmethod
+    def _raising(exc):
+        class FakeDDGS:
+            def text(self, query, **kwargs):
+                raise exc
+
+        return FakeDDGS
+
+    def test_no_results_becomes_an_empty_list(self, monkeypatch):
+        monkeypatch.setattr(
+            t2url, "DDGS", self._raising(DDGSException("No results found.")))
+
+        assert t2url.text_to_urls("iceberg") == []
+
+    def test_a_real_failure_still_propagates(self, monkeypatch):
+        """Rate limits and transport errors must stay visible — swallowing them
+        would report a blocked engine as a query with no matches."""
+        monkeypatch.setattr(
+            t2url, "DDGS", self._raising(DDGSException("Ratelimit: HTTP 429")))
+
+        with pytest.raises(DDGSException, match="429"):
+            t2url.text_to_urls("iceberg")

@@ -74,6 +74,43 @@ def save_search(query, urls, *, provider=None, region=None, safesearch=None,
         return cur.lastrowid
 
 
+def backup(dest):
+    """Write a consistent snapshot of the dev store to `dest`. Returns the path.
+
+    Uses SQLite's online backup API rather than a file copy, because the app
+    holds the database open while it runs: copying the file mid-write can capture
+    a torn page, and that corruption stays invisible until the backup is the only
+    copy left. The API takes a proper read lock and restarts if the source
+    changes underneath it, so `make dev` can keep serving throughout.
+
+    Refuses to overwrite. A backup command that silently replaces the previous
+    snapshot is one keystroke away from destroying the history it exists to keep,
+    so a new name per run is the caller's job — see data/backup.py.
+    """
+    dest = Path(dest)
+    if not DB_PATH.exists():
+        # sqlite3.connect() would happily create an empty file here and the
+        # backup would "succeed" with zero rows, which is worse than failing.
+        raise FileNotFoundError(DB_PATH)
+    if dest.exists():
+        raise FileExistsError(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    source, target = _db(), sqlite3.connect(dest)
+    ok = False
+    try:
+        source.backup(target)
+        ok = True
+    finally:
+        target.close()
+        source.close()
+        if not ok:
+            # A half-written file must not survive looking like a backup — the
+            # next run would refuse to overwrite it and the real one never lands.
+            dest.unlink(missing_ok=True)
+    return dest
+
+
 def list_searches(limit=50):
     """Recent searches, newest first, each with its ordered URLs."""
     with _db() as conn:

@@ -24,6 +24,8 @@ installed.
 
 import json
 import os
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -49,7 +51,26 @@ SUPPORTS = {
     "arxiv": frozenset({"timelimit"}),
 }
 
-HTTP_TIMEOUT_S = 15
+# A short ceiling with several attempts, rather than one long wait.
+#
+# Measured against the live arXiv API: a normal answer arrives in well under a second,
+# but the endpoint intermittently stalls for a minute or more — and it stalls by query
+# *time*, not by query text, since the same search that burned 61s and failed returned
+# in 0.5s a few minutes later. A single 15s attempt turned each of those blips into
+# `TimeoutError: The read operation timed out` on the user's screen; a single 30s one
+# only made the same failure slower. Against a stall, abandoning the socket early and
+# asking again is what recovers, so the budget is spent on attempts.
+#
+# Worst case is roughly TIMEOUT * ATTEMPTS + WAIT * (ATTEMPTS - 1) ≈ 38s, and only on
+# the path where the search has already failed. Wikipedia and OpenAlex answer in about
+# a second, so the ceiling is never near them.
+#
+# Read from the environment so a slow or proxied network can be accommodated without a
+# code change. Resolved once at import, like T2URL_DB and unlike T2URL_CONTACT, so it
+# has to be set before the process starts.
+HTTP_TIMEOUT_S = float(os.environ.get("T2URL_HTTP_TIMEOUT") or 12)
+HTTP_ATTEMPTS = 3
+HTTP_RETRY_WAIT_S = 1.0
 
 # Recency windows, in days. `d`/`w`/`m`/`y` are the values the UI offers; the same
 # four map onto every provider that supports a period at all.
@@ -73,6 +94,20 @@ def _user_agent():
     return f"{base} ({contact})" if contact else base
 
 
+def _request_once(url, params):
+    """One outbound HTTP request, no retry.
+
+    Kept separate from `_get_bytes` so the retry policy above it is testable: the
+    suite severs the network by patching `_get_bytes`, so anything living inside
+    that function would never run under test.
+    """
+    query = urllib.parse.urlencode(params, doseq=True)
+    request = urllib.request.Request(
+        f"{url}?{query}", headers={"User-Agent": _user_agent()})
+    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
+        return response.read()
+
+
 def _get_bytes(url, params):
     """The one place this repo makes an outbound HTTP request.
 
@@ -80,14 +115,24 @@ def _get_bytes(url, params):
     suite blocks the network by patching this single function, and any future
     retry, backoff, or proxy policy has exactly one place to live.
 
+    Retries a timeout or a transport failure, because those are the ones another
+    attempt actually fixes. An HTTPError is a real answer from the server — a 404 or
+    a 403 says the same thing however often it is asked, so it is raised immediately.
+
     It calls search and metadata APIs only. It never dereferences a result URL —
     see "The one-line commitment" in governance/DATA_CLASSIFICATION.md.
     """
-    query = urllib.parse.urlencode(params, doseq=True)
-    request = urllib.request.Request(
-        f"{url}?{query}", headers={"User-Agent": _user_agent()})
-    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
-        return response.read()
+    for attempt in range(1, HTTP_ATTEMPTS + 1):
+        try:
+            return _request_once(url, params)
+        except urllib.error.HTTPError:
+            raise
+        except (TimeoutError, urllib.error.URLError):
+            if attempt == HTTP_ATTEMPTS:
+                raise
+            time.sleep(HTTP_RETRY_WAIT_S)
+    # Unreachable: the loop either returns or raises on its last attempt.
+    raise AssertionError("HTTP_ATTEMPTS must be at least 1")
 
 
 def _get_json(url, params):

@@ -17,6 +17,10 @@ node_modules/
 *.db-journal
 *.db-wal
 
+# Local snapshots from `make backup`. They hold the same real query text as the
+# dev store, so they are no more committable than it is.
+backups/
+
 # Terraform — state can carry resource metadata and must not be committed
 .terraform/
 .terraform.lock.hcl

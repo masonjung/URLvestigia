@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Webdig — Text to URLs</title>
+    <title>URLoom — Text to URLs</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Crect%20width='24'%20height='24'%20rx='6'%20fill='%23f5821f'/%3E%3Cg%20stroke='%231d1206'%20stroke-width='2'%20fill='none'%20stroke-linecap='round'%3E%3Ccircle%20cx='10.5'%20cy='10'%20r='5.5'/%3E%3Cpath%20d='M14.6%2014.1%2019%2018.5'/%3E%3Cpath%20d='M7.5%208.5h6M8.5%2011.5h4'/%3E%3C/g%3E%3C/svg%3E" />
     <style>
       :root {
@@ -298,8 +298,8 @@
             </svg>
           </div>
           <div>
-            <h1>Webdig</h1>
-            <p class="tagline">Dig the web — turn plain text into a structured table of URLs</p>
+            <h1>URLoom</h1>
+            <p class="tagline">Weave plain text into a structured table of URLs</p>
           </div>
         </div>
         <div class="stats">
@@ -325,10 +325,14 @@
           <span class="opt opt-backend">
             via
             <span class="engines">
+              <!-- All four start checked for resilience, not coverage: one blocked or
+                   rate-limited engine no longer empties the search. More engines is
+                   not more results — ddgs queries them concurrently and drops the ones
+                   that miss its first wait(). See docs/ARCHITECTURE.md. -->
               <input type="checkbox" id="be-ddg" name="backend" value="duckduckgo" checked /><label for="be-ddg">DuckDuckGo</label>
-              <input type="checkbox" id="be-yah" name="backend" value="yahoo" /><label for="be-yah">Yahoo</label>
-              <input type="checkbox" id="be-sta" name="backend" value="startpage" /><label for="be-sta">Startpage</label>
-              <input type="checkbox" id="be-yan" name="backend" value="yandex" /><label for="be-yan">Yandex</label>
+              <input type="checkbox" id="be-yah" name="backend" value="yahoo" checked /><label for="be-yah">Yahoo</label>
+              <input type="checkbox" id="be-sta" name="backend" value="startpage" checked /><label for="be-sta">Startpage</label>
+              <input type="checkbox" id="be-yan" name="backend" value="yandex" checked /><label for="be-yan">Yandex</label>
             </span>
           </span>
           for up to
@@ -383,6 +387,12 @@
             <form method="post" action="/dedupe">
               <button id="dedupe" class="head-btn" type="submit"
                 title="Delete duplicate URLs across searches, keeping the earliest">Dedupe URLs</button>
+            </form>
+            <!-- Store sits before Clear all so the one destructive action stays
+                 rightmost and visually separated. -->
+            <form method="post" action="/store">
+              <button id="store" class="head-btn" type="submit"
+                title="Save a dated snapshot of the database to backups/ — never overwrites">Store</button>
             </form>
             <form method="post" action="/clear">
               <button id="clear-all" class="head-btn" type="submit">Clear all</button>

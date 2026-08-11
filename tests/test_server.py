@@ -5,13 +5,14 @@ is actually responsible for: input validation, POST-redirect-GET, and rendering.
 """
 
 import pytest
+import t2url
 
 
 def test_home_renders(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "Webdig" in response.text
+    assert "URLoom" in response.text
     assert "saved_searches" in response.text
 
 
@@ -33,6 +34,7 @@ def test_search_redirects_and_saves(client):
 @pytest.mark.parametrize("route,payload", [
     ("/search", {"text": "iceberg"}),
     ("/dedupe", {}),
+    ("/store", {}),
     ("/clear", {}),
 ])
 def test_mutations_always_redirect(client, route, payload):
@@ -79,10 +81,17 @@ def test_unknown_engine_is_dropped(client):
     assert client.search_calls[0]["backend"] == "duckduckgo"
 
 
-def test_no_engine_selected_falls_back_to_duckduckgo(client):
+def test_no_engine_selected_falls_back_to_every_engine(client):
+    """Unticking everything means "ask them all", not "ask the first one".
+
+    Resilience, not coverage: a wider selection can return *fewer* URLs than the best
+    single engine (see docs/ARCHITECTURE.md), but a blocked engine stops being fatal.
+    """
+    from app import server
+
     client.post("/search", data={"text": "a"})
 
-    assert client.search_calls[0]["backend"] == "duckduckgo"
+    assert client.search_calls[0]["backend"] == ",".join(server.OPTIONS["backend"])
 
 
 def test_engine_order_and_uniqueness_are_preserved(client):
@@ -97,12 +106,30 @@ def test_engine_order_and_uniqueness_are_preserved(client):
 
 # --- provider selection ----------------------------------------------------
 
-@pytest.mark.parametrize("provider", ["ddgs", "wikipedia", "openalex", "arxiv"])
+@pytest.mark.parametrize("provider", ["ddgs", "wikipedia", "arxiv"])
 def test_every_ui_provider_is_accepted(client, provider):
     """A typo here is a radio button that silently searches the web instead."""
     client.post("/search", data={"text": "a", "provider": provider})
 
     assert client.search_calls[0]["provider"] == provider
+
+
+def test_every_offered_provider_is_implemented():
+    """The UI list may be a subset of what ai/ implements — openalex is implemented
+    but withdrawn from the form — but it can never be a superset. Offering a provider
+    with no registry entry would silently search the web under another name, and
+    `_pick`'s whitelist would not catch it because the name *is* whitelisted."""
+    from app import server
+
+    assert set(server.OPTIONS["provider"]) <= set(t2url.REGISTRY)
+
+
+def test_a_withdrawn_provider_cannot_be_posted(client):
+    """openalex is gone from the form but still in the registry, so the whitelist is
+    the only thing stopping a hand-crafted POST from reaching it."""
+    client.post("/search", data={"text": "a", "provider": "openalex"})
+
+    assert client.search_calls[0]["provider"] == "ddgs"
 
 
 def test_unknown_provider_falls_back_to_the_default(client):
@@ -145,9 +172,11 @@ def test_supported_but_unset_is_stored_empty_not_null(client, temp_db):
     client.post("/search", data={"text": "a", "provider": "ddgs", "timelimit": ""})
 
     row = temp_db.list_searches()[0]
+    from app import server
+
     assert row["timelimit"] == ""
     assert row["safesearch"] == "moderate"
-    assert row["backend"] == "duckduckgo"
+    assert row["backend"] == ",".join(server.OPTIONS["backend"])
 
 
 def test_scholarly_provider_records_its_time_window(client, temp_db):
@@ -172,7 +201,46 @@ def test_retrieval_error_surfaces_as_a_message(client, monkeypatch):
     response = client.post("/search", data={"text": "a"}, follow_redirects=False)
 
     assert response.status_code == 303
-    assert "Error" in client.get(response.headers["location"]).text
+    body = client.get(response.headers["location"]).text
+    # The literal prefix is load-bearing: the template keys its red styling off it.
+    assert "Error" in body
+    assert "rate limited" in body
+
+
+def test_a_failure_names_the_provider_and_engines(client, monkeypatch):
+    """The library's own text says nothing about what was searched. Without this the
+    user cannot tell a blocked engine from a query with no matches."""
+    from app import server
+
+    def boom(text, **kwargs):
+        raise RuntimeError("rate limited")
+
+    monkeypatch.setattr(server.t2url, "text_to_urls", boom)
+    response = client.post("/search", data={
+        "text": "a", "provider": "ddgs", "backend": ["duckduckgo", "yahoo"],
+    }, follow_redirects=False)
+
+    body = client.get(response.headers["location"]).text
+    assert "Web (duckduckgo + yahoo)" in body
+
+
+def test_a_failure_names_a_non_web_provider_without_engines(client, monkeypatch):
+    """`backend` is a ddgs concept — naming it for arXiv would claim an engine chain
+    that never ran, the same false claim the NULL storage exists to prevent."""
+    from app import server
+
+    def boom(text, **kwargs):
+        raise RuntimeError("timed out")
+
+    monkeypatch.setattr(server.t2url, "text_to_urls", boom)
+    response = client.post("/search", data={"text": "a", "provider": "arxiv"},
+                           follow_redirects=False)
+
+    # Asserted on the redirect target rather than the rendered page, whose engine
+    # checkboxes name every engine regardless of what was searched.
+    message = response.headers["location"]
+    assert "arXiv%20search%20failed" in message
+    assert "duckduckgo" not in message
 
 
 def test_no_results_is_reported_not_silently_saved(client, monkeypatch):
@@ -233,9 +301,20 @@ def test_single_engine_renders_its_name(client):
 
 
 def test_provider_column_shows_a_readable_label(client):
-    client.post("/search", data={"text": "a", "provider": "openalex"})
+    client.post("/search", data={"text": "a", "provider": "arxiv"})
 
-    assert ">OpenAlex<" in client.get("/").text
+    assert ">arXiv<" in client.get("/").text
+
+
+def test_a_withdrawn_provider_still_has_a_label(client, temp_db):
+    """Rows searched before openalex left the form must keep reading "OpenAlex".
+    PROVIDER_LABELS covers every provider ever searched, not just the ones offered,
+    so retiring one from the UI cannot relabel history with the bare id."""
+    temp_db.save_search("a", ["https://example.org/1"], provider="openalex")
+
+    body = client.get("/").text
+    assert ">OpenAlex<" in body
+    assert ">openalex<" not in body
 
 
 def test_unsupported_and_unset_render_differently(client):
@@ -258,9 +337,17 @@ def test_provider_controls_are_hidden_by_generated_css(client):
     body = client.get("/").text
 
     assert ".sentence:has(#pv-wikipedia:checked) .opt-timelimit" in body
-    assert ".sentence:has(#pv-openalex:checked) .opt-region" in body
+    assert ".sentence:has(#pv-arxiv:checked) .opt-region" in body
     # ddgs applies every option, so it hides nothing.
     assert ".sentence:has(#pv-ddgs:checked)" not in body
+
+
+def test_a_withdrawn_provider_renders_no_control(client):
+    """No radio and no CSS rule for a provider that is not on offer."""
+    body = client.get("/").text
+
+    assert 'id="pv-openalex"' not in body
+    assert "#pv-openalex" not in body
 
 
 def test_query_text_is_escaped(client):
@@ -308,3 +395,68 @@ def test_clear_empties_the_table(client):
     client.post("/clear")
 
     assert "No searches yet" in client.get("/").text
+
+
+# --- Store -----------------------------------------------------------------
+
+def test_store_writes_a_snapshot_and_reports_its_contents(client):
+    from app import server
+
+    client.post("/search", data={"text": "a"})
+    response = client.post("/store", follow_redirects=False)
+
+    written = list((server.backup.DEFAULT_DIR).glob("t2url-*.db"))
+    assert len(written) == 1
+    body = client.get(response.headers["location"]).text
+    assert "Stored" in body
+    assert "1 searches, 3 URLs" in body
+
+
+def test_store_leaves_the_live_table_untouched(client):
+    """Storing is the one header action that changes nothing in the store — the
+    guarantee that makes it safe to sit beside Clear all."""
+    from app import server
+
+    client.post("/search", data={"text": "zeta-survivor-query"})
+    before = server.db.stats()
+
+    client.post("/store")
+
+    assert server.db.stats() == before
+    assert "zeta-survivor-query" in client.get("/").text
+
+
+def test_store_reports_a_second_press_as_a_failure_not_a_success(client, monkeypatch):
+    """Snapshot names are second-resolution, so a double-click writes nothing the
+    second time. Reporting that as "Stored" would claim a backup that does not
+    exist — the same false claim the NULL option columns exist to prevent."""
+    from app import server
+
+    monkeypatch.setattr(server.backup, "snapshot",
+                        lambda *a, **kw: (_ for _ in ()).throw(FileExistsError("x.db")))
+    response = client.post("/store", follow_redirects=False)
+
+    body = client.get(response.headers["location"]).text
+    assert "Error" in body  # the template keys its red styling off this prefix
+    assert "Stored" not in body
+
+
+def test_store_failure_surfaces_as_a_message(client, monkeypatch):
+    from app import server
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(server.backup, "snapshot", boom)
+    response = client.post("/store", follow_redirects=False)
+
+    body = client.get(response.headers["location"]).text
+    assert "Error" in body
+    assert "disk full" in body
+
+
+def test_store_button_is_rendered(client):
+    body = client.get("/").text
+
+    assert 'action="/store"' in body
+    assert ">Store<" in body

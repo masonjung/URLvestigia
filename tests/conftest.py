@@ -104,7 +104,7 @@ def fake_results():
 
 
 @pytest.fixture
-def client(monkeypatch, temp_db):
+def client(monkeypatch, tmp_path, temp_db):
     """FastAPI test client with retrieval stubbed out.
 
     No test in this suite may touch the network — a suite that fails because
@@ -115,6 +115,11 @@ def client(monkeypatch, temp_db):
     from app import server
 
     monkeypatch.setattr(server.db, "DB_PATH", temp_db.DB_PATH)
+    # Redirect the Store button away from the developer's real backups/ before
+    # any test can press it. Done here rather than per-test for the same reason
+    # as `no_network`: a route test that forgot would litter the working tree
+    # with snapshots, and nothing would fail to say so.
+    monkeypatch.setattr(server.backup, "DEFAULT_DIR", tmp_path / "backups")
 
     def fake_search(text, **kwargs):
         fake_search.calls.append({"text": text, **kwargs})

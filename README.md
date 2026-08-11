@@ -4,8 +4,9 @@
 persisted list of source links — with the query, provider, engines, region, and time
 window stored alongside, so a search becomes an artifact instead of an activity.
 
-Search the web, Wikipedia, OpenAlex, or arXiv. Each exposes only the options it
-genuinely applies, and the record says which.
+Search the web, Wikipedia, or arXiv. Each exposes only the options it genuinely
+applies, and the record says which. (OpenAlex is implemented and callable from the AI
+layer, but is not currently offered on the form — see `app/server.py:OPTIONS`.)
 
 Built to the Cloudera Forge standard accelerator layout: every layer of the reference
 stack — Ingest → Lakehouse → Process → AI → Serve — wired end to end and governed by
@@ -26,7 +27,7 @@ make install
 make dev                 # → http://127.0.0.1:8000/
 
 # 2. The Harden gate
-make test                # 186 passing, 13 skipped (the live tier)
+make test                # 219 passing, 13 skipped (the live tier)
 
 # 3. See how the whole solution deploys (every step dry-runs)
 make -n deploy
@@ -166,5 +167,9 @@ Two tiers, one schema shape. **SQLite** for local development — a single file 
 Iceberg** for the platform. SQLite is not a placeholder: an accelerator has to run on
 a laptop before any CDP environment exists.
 [`data/ingest/load_to_iceberg.py`](data/ingest/load_to_iceberg.py) is the bridge.
+
+`make backup` — or the **Store** button in the app — takes a dated local snapshot of
+the dev store, safe to take while the app is serving and never overwriting a previous
+one. Details in [`data/README.md`](data/README.md#backups).
 
 Only links are stored, never page content.

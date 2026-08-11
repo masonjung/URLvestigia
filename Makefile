@@ -14,12 +14,13 @@ SHELL := /bin/bash
 VENV_PY := $(wildcard .venv/Scripts/python.exe) $(wildcard .venv/bin/python)
 PYTHON  ?= $(if $(VENV_PY),$(firstword $(VENV_PY)),python3)
 
-CATALOG  ?= spark_catalog
-DATABASE ?= t2url
-PORT     ?= 8000
+CATALOG    ?= spark_catalog
+DATABASE   ?= t2url
+PORT       ?= 8000
+BACKUP_DIR ?= backups
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev test test-live ingest pipelines govern provision deploy new clean
+.PHONY: help install dev test test-live backup ingest pipelines govern provision deploy new clean
 
 ## help: list every target
 help:
@@ -30,6 +31,9 @@ help:
 	@echo "    make dev         run the Serve layer  → http://127.0.0.1:$(PORT)/"
 	@echo "    make test        the Harden gate (no network)"
 	@echo "    make test-live   add the tests that call real search engines"
+	@echo ""
+	@echo "  Keep the dev store"
+	@echo "    make backup      dated local snapshot → $(BACKUP_DIR)/ (safe while running)"
 	@echo ""
 	@echo "  Inspect the platform layers (all dry runs)"
 	@echo "    make ingest      SQLite → Iceberg load plan"
@@ -67,6 +71,12 @@ test-live:
 	@echo "Calling real search engines. Failures here are often measurements,"
 	@echo "not defects — record them in governance/model_cards/."
 	$(PYTHON) -m pytest tests -q --live
+
+## backup: snapshot the SQLite dev store to a dated local file
+# No --execute here, unlike the platform targets: this writes one new local file
+# and refuses to overwrite, so there is nothing remote to guard.
+backup:
+	$(PYTHON) data/backup.py --dir $(BACKUP_DIR)
 
 ## ingest: print the SQLite → Iceberg load plan
 ingest:

@@ -1,4 +1,4 @@
-# Design system — the Webdig UI
+# Design system — the URLoom UI
 
 The Serve layer's design spec. Every token below is a CSS custom property declared in
 the `:root` block of [`app/templates/index.html`](../../app/templates/index.html),
@@ -13,7 +13,7 @@ The contrast is the design: input is warm and inviting, output is a machine reco
 
 ```
 ┌─────────────────────────────────────────┐
-│  ▣ Webdig                    [chips]    │   app shell
+│  ▣ URLoom                    [chips]    │   app shell
 │  ┌───────────────────────────────────┐  │   light, orange accent
 │  │  New search                       │  │
 │  │  [ textarea                     ] │  │
@@ -22,7 +22,7 @@ The contrast is the design: input is warm and inviting, output is a machine reco
 │  │                        [ Search ] │  │
 │  └───────────────────────────────────┘  │
 ├─────────────────────────────────────────┤
-│  saved_searches      [Dedupe][Clear]    │   terminal panel
+│  saved_searches  [Dedupe][Store][Clear] │   terminal panel
 │  # │ Question │ URLs │ Time │ Engine…   │   dark, green monospace
 └─────────────────────────────────────────┘
 ```

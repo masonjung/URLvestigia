@@ -19,6 +19,7 @@ is the bridge between the two.
 | `schema.sql` | The SQLite schema: `searches`, `search_urls`, one index |
 | `iceberg/ddl.sql` | Iceberg DDL for the platform tier: `raw_searches`, `raw_search_urls`, `curated_urls` |
 | `ingest/load_to_iceberg.py` | Loads the SQLite dev store into the raw Iceberg tables |
+| `backup.py` | Dated local snapshots of the dev store, safe to take while it runs |
 | `t2url.db` | The database itself — **gitignored**, created on first run |
 
 ## The model
@@ -46,6 +47,43 @@ Move the dev database anywhere with the `T2URL_DB` environment variable:
 ```bash
 T2URL_DB=/tmp/scratch.db make dev
 ```
+
+## Backups
+
+The dev store is gitignored and lives at one path, so without a second copy every
+search you have run exists on exactly one disk.
+
+```bash
+make backup                          # -> backups/t2url-<utc>.db
+make backup BACKUP_DIR=/d/archive    # anywhere else on this device
+python data/backup.py --dest x.db    # an exact filename
+```
+
+Or press **Store** in the app's `saved_searches` header, which posts to `/store` and
+calls the same `backup.snapshot()` the CLI does — so a snapshot taken from the button
+and one taken from the shell are the same artifact in the same place. Set
+`T2URL_BACKUP_DIR` to point the button somewhere else, the way `T2URL_DB` moves the
+store itself.
+
+Safe to run while `make dev` is serving. `db.backup()` uses SQLite's online
+backup API rather than a file copy, because the app holds the database open:
+copying the file mid-write can capture a torn page, and that corruption stays
+invisible until the backup is the only copy left.
+
+Snapshots are **never overwritten** — each run writes a new UTC-stamped name, and
+an existing destination is an error rather than a replacement. `backups/` is
+gitignored for the same reason `t2url.db` is: it holds the same real query text.
+
+To restore, stop the server and copy a snapshot back over `data/t2url.db` — or
+leave it where it is and point the app at it:
+
+```bash
+T2URL_DB=backups/t2url-20260811-223521.db make dev
+```
+
+A backup is a *local* copy on this device, which is a different guarantee from
+`make ingest`: that promotes the same rows into the governed Iceberg tables,
+where retention and lineage apply. Neither replaces the other.
 
 ## Conventions
 
