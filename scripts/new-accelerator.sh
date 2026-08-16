@@ -117,9 +117,16 @@ else
   find "$DEST" -name '*.bak' -delete
 fi
 
-# --- 4. A README that says what to do next ---------------------------------
-step "4/5  Write a starting README"
-if ! $DRY_RUN; then
+# --- 4. A README and catalog metadata that say what to do next --------------
+# METADATA.yaml is rewritten rather than sed-re-pointed: the step above only
+# rewrites the *name*, and a catalog entry that inherited T2URL's slug,
+# description, tags, and GitHub link while carrying a new name is worse than an
+# empty one — it looks filled in.
+step "4/5  Write a starting README and METADATA.yaml"
+if $DRY_RUN; then
+  echo "    ${DEST}/README.md"
+  echo "    ${DEST}/METADATA.yaml"
+else
   cat > "${DEST}/README.md" <<EOF
 # ${NAME}
 

@@ -1,0 +1,61 @@
+# Cloudera Blueprint catalog metadata
+# Populate fields used by the master blueprint website and internal catalog.
+
+# --- Identity ---
+name: "Turn Text into a Governed Table of URLs"
+slug: "t2url"                                # URL-safe repo / catalog identifier
+description: "Turn a natural-language question into a persisted, governed table of source URLs."
+reprise_link: "https://[catalog-url]/t2url"          # Public reprise link
+
+# --- Classification (website filters) ---
+catalog_classification:
+  - Enterprise Blueprint                     # Options: Enterprise Blueprint | Research | Launchable (AMP) | Developer Example
+launchable: false                            # No .project-metadata.yaml — this is a Forge template, not an AMP
+lifecycle_status: Active                     # Maintained, not retired. NOTE: the repo is
+                                             # ⚠️ incomplete at the Harden gate — see "Status"
+                                             # in README.md before this is offered for deployment.
+
+# --- Industry & alignment ---
+industry: General                            # e.g., General | Telecom | Financial Services | Healthcare & Life Sciences | Retail | Media | Physical AI & Robotics
+industry_alignment: "Horizontal"             # `make new VERTICAL=… USECASE=…` re-points it at any vertical
+target_vertical: ""                          # Optional finer-grained vertical
+
+# --- Tags (website search & browse) ---
+tags:
+  - metasearch
+  - web-search
+  - retrieval
+  - iceberg
+  - data-governance
+  - accelerator-template
+
+# --- Relationships ---
+product_mapping:                             # Cloudera products used — see docs/ARCHITECTURE.md "Layer by layer"
+  - Cloudera AI Application                  # Serve — app/, FastAPI + Jinja2
+  - Cloudera AI Workbench                    # AI — ai/t2url.py, text_to_urls()
+  - Cloudera Data Engineering                # Ingest + Process — data/ingest/, pipelines/
+  - Cloudera Data Warehouse                  # Lakehouse — Iceberg on CDW / Data Lake
+  - SDX                                      # Governance — Ranger policies, Atlas lineage
+# model_dependencies:                          # None. T2URL has no weights, no embeddings, and no
+#                                              # inference of its own — it is a metasearch client.
+#                                              # See governance/model_cards/t2url-retrieval.md.
+#                                              # It does call third-party public endpoints (ddgs web
+#                                              # engines, Wikipedia, OpenAlex, arXiv), which is a
+#                                              # deployability constraint rather than a model
+#                                              # dependency: governance/DATA_CLASSIFICATION.md.
+
+# --- Provenance ---
+publisher: cloudera                          # cloudera | partner-name
+source: Internal                             # Internal | Partner | NVIDIA Adaptation | Customer
+
+# --- Repository & assets ---
+public_github_link: "https://github.com/masonjung/T2URL"
+#private_github_link: ""                      # If applicable, original repo during development
+
+# --- Ownership ---
+maintainer_name: "Minseok Jung"
+
+# --- Dates ---
+date_created: "2026-06-22"                   # First commit
+date_updated: "2026-08-15"
+published_date: ""                           # Set when it first appears in the catalog
