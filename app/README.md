@@ -14,11 +14,11 @@ Discover → Qualify demo loop short.
 |---|---|
 | `server.py` | The FastAPI app: renders the page, handles form posts, validates every option against a whitelist |
 | `templates/index.html` | The entire UI — one Jinja2 template, HTML + CSS only |
-| `requirements.txt` | This layer's dependencies, pulling in `ai/` since `server.py` imports it |
+| `requirements.txt` | This layer's dependencies, pulling in `retrieval/` since `server.py` imports it |
 | `__init__.py` | Makes `app` importable so `uvicorn app.server:app` resolves |
 
 Dependencies live with their layer, the same way the Forge template keeps
-`package.json` inside `app/`. Because the Serve layer pulls in the AI layer,
+`package.json` inside `app/`. Because the Serve layer pulls in the retrieval layer,
 `app/requirements.txt` plus `tests/requirements.txt` is the full closure — that is
 what `make install` installs.
 
@@ -31,16 +31,16 @@ uvicorn app.server:app --reload           # same thing, without make
 
 ## How it wires to the other layers
 
-`server.py` puts `ai/` and `data/` on the import path, then calls into them:
+`server.py` puts `retrieval/` and `data/` on the import path, then calls into them:
 
 ```
 app/server.py
-  ├── import t2url   → ai/t2url.py     (AI layer: text → ranked URLs)
-  └── import db      → data/db.py      (Lakehouse layer: persist searches + URLs)
+  ├── import t2url   → retrieval/t2url.py   (retrieval layer: text → ranked URLs)
+  └── import db      → data/db.py           (Lakehouse layer: persist searches + URLs)
 ```
 
 The Serve layer holds **no business logic and no SQL**. Retrieval belongs to
-`ai/`, persistence belongs to `data/`. If you find yourself writing a query here,
+`retrieval/`, persistence belongs to `data/`. If you find yourself writing a query here,
 it belongs in `data/db.py`.
 
 ## Conventions
@@ -70,6 +70,6 @@ useful for local demos before a CDP environment exists.
 
 The Forge template's reference app is React 19 + TypeScript + Tailwind + Vite. If
 this accelerator moves that way, keep `server.py` as the JSON API, add the SPA
-under `app/web/`, and point `make dev` at both. Nothing in `ai/`, `data/`,
+under `app/web/`, and point `make dev` at both. Nothing in `retrieval/`, `data/`,
 `pipelines/`, or `governance/` should need to change — that is the test of whether
 the layering held.

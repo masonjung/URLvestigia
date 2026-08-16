@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 APP_DIR = Path(__file__).resolve().parent
 ROOT = APP_DIR.parent
-sys.path.insert(0, str(ROOT / "ai"))
+sys.path.insert(0, str(ROOT / "retrieval"))
 sys.path.insert(0, str(ROOT / "data"))
 
 import backup
@@ -27,7 +27,7 @@ db.init_db()
 
 # Allowed values per search option; first entry is the default fallback.
 #
-# `provider` is the list the UI offers, which is a subset of what ai/ implements —
+# `provider` is the list the UI offers, which is a subset of what retrieval/ implements —
 # openalex is still a working provider in t2url.REGISTRY, it is simply not on the
 # form. Anything not listed here is coerced back to the default by _pick(), so a
 # provider withdrawn from the UI cannot be reached by posting it by hand either.
@@ -63,7 +63,7 @@ def _providers():
     """Provider id, label, and the options it does not apply.
 
     The template renders its radio pills and emits its control-visibility CSS from
-    this, so the support matrix in ai/providers.py is never restated in markup
+    this, so the support matrix in retrieval/providers.py is never restated in markup
     where it could drift out of step with what the server enforces.
     """
     return [{

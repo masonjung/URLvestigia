@@ -1,4 +1,4 @@
-"""AI layer — the API providers behind `ai/providers.py`.
+"""AI layer — the API providers behind `retrieval/providers.py`.
 
 Every provider is exercised through the one HTTP seam, `_get_bytes`. Patching it
 stubs the network for all of them at once, which is the same property the suite's

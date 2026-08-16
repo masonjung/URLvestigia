@@ -17,8 +17,8 @@ Each provider returns a plain list of absolute http(s) URLs, in the order the
 provider ranked them. Deduplication and the `max_results` ceiling are applied once,
 in t2url.py, so every provider inherits the same guarantees.
 
-Stdlib only. ai/requirements.txt stays at one dependency so this layer keeps the
-property ai/README.md claims for it: importable and testable with nothing else
+Stdlib only. retrieval/requirements.txt stays at one dependency so this layer keeps the
+property retrieval/README.md claims for it: importable and testable with nothing else
 installed.
 """
 

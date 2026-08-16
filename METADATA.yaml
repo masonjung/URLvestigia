@@ -32,7 +32,7 @@ tags:
 # --- Relationships ---
 product_mapping:                             # Cloudera products used — see docs/ARCHITECTURE.md "Layer by layer"
   - Cloudera AI Application                  # Serve — app/, FastAPI + Jinja2
-  - Cloudera AI Workbench                    # AI — ai/t2url.py, text_to_urls()
+  - Cloudera AI Workbench                    # AI — retrieval/t2url.py, text_to_urls()
   - Cloudera Data Engineering                # Ingest + Process — data/ingest/, pipelines/
   - Cloudera Data Warehouse                  # Lakehouse — Iceberg on CDW / Data Lake
   - SDX                                      # Governance — Ranger policies, Atlas lineage

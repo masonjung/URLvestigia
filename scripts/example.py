@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ai"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "retrieval"))
 
 from t2url import text_to_urls
 

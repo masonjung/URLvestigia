@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 _TMP_DB = Path(tempfile.gettempdir()) / "t2url-pytest.db"
 os.environ["T2URL_DB"] = str(_TMP_DB)
 
-for layer in ("ai", "data", "pipelines/jobs"):
+for layer in ("retrieval", "data", "pipelines/jobs"):
     sys.path.insert(0, str(ROOT / layer))
 sys.path.insert(0, str(ROOT))  # so `import app.server` resolves
 

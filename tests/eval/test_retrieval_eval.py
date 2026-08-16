@@ -1,4 +1,4 @@
-"""AI eval harness — the Harden gate for `ai/t2url.py`.
+"""Retrieval eval harness — the Harden gate for `retrieval/t2url.py`.
 
 Two tiers:
 
@@ -13,7 +13,7 @@ make test                 # contract tier only
 pytest tests/eval --live  # add the live tier
 ```
 
-The numbers the model card records come from `ai/notebooks/retrieval_eval.ipynb`.
+The numbers the model card records come from `retrieval/notebooks/eval.ipynb`.
 This file asserts the properties; the notebook measures them.
 """
 
@@ -25,7 +25,7 @@ import t2url
 
 ENGINES = ["duckduckgo", "yahoo", "startpage", "yandex"]
 
-# Every corpus the AI layer implements, which is a superset of what the UI offers —
+# Every corpus the retrieval layer implements, which is a superset of what the UI offers —
 # openalex is still evaluated here after being withdrawn from the form, because the
 # provider is what these tests measure and it remains callable. These are an axis, not
 # links in the `backend` chain: a web-search miss must not fall through to arXiv and
@@ -182,7 +182,7 @@ class TestLiveRetrieval:
     def test_fallback_chain_is_at_least_as_good_as_one_engine(self):
         """The chain exists so a throttled engine cannot fail a search. If it
         ever returns *fewer* results than the default alone, the ordering is
-        wrong — see the overlap analysis in ai/notebooks/retrieval_eval.ipynb."""
+        wrong — see the overlap analysis in retrieval/notebooks/eval.ipynb."""
         query = "cloudera data engineering spark"
         solo = t2url.text_to_urls(query, max_results=10)
         time.sleep(self.COOLDOWN_S)

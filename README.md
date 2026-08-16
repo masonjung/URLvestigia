@@ -5,8 +5,8 @@ persisted list of source links — with the query, provider, engines, region, an
 window stored alongside, so a search becomes an artifact instead of an activity.
 
 Search the web, Wikipedia, or arXiv. Each exposes only the options it genuinely
-applies, and the record says which. (OpenAlex is implemented and callable from the AI
-layer, but is not currently offered on the form — see `app/server.py:OPTIONS`.)
+applies, and the record says which. (OpenAlex is implemented and callable from
+`retrieval/`, but is not currently offered on the form — see `app/server.py:OPTIONS`.)
 
 Built to the Cloudera Forge standard accelerator layout: every layer of the reference
 stack — Ingest → Lakehouse → Process → AI → Serve — wired end to end and governed by
@@ -47,10 +47,10 @@ T2URL/
 ├── infra/        IaC — CDP CLI / Terraform             → one-time platform provisioning
 ├── data/         SQLite dev store · Iceberg DDL        → Ingest + Lakehouse layers
 ├── pipelines/    Data Engineering (Spark) jobs         → Process layer
-├── ai/           retrieval · notebooks · eval          → AI layer
+├── retrieval/    search providers · notebooks · eval   → AI layer
 ├── app/          FastAPI + Jinja2 dashboard            → Serve layer
 ├── governance/   SDX policies · model card            → security · policy · lineage
-├── tests/        data quality · AI eval harness        → the Harden gate
+├── tests/        data quality · retrieval eval        → the Harden gate
 ├── .cicd/        build → test → deploy                 → one Git-driven pipeline
 ├── .gitlab/      MR + issue templates                  → the process, where the work is
 ├── scripts/      new-accelerator.sh                    → scaffold the next one
@@ -69,7 +69,7 @@ and which Cloudera API/tool automates it.
    app/server.py ──── whitelists every option, clamps max_results to 1–50
         │
         ▼
-   ai/t2url.py ────── one provider per search:
+   retrieval/t2url.py ────── one provider per search:
         │             ddgs → DuckDuckGo · Yahoo · Startpage · Yandex
         │                    fallback chain: a throttled engine doesn't fail it
         │             wikipedia · openalex · arxiv → their own keyless APIs
@@ -102,7 +102,7 @@ Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
   entirely server-side with **no JavaScript and no build step**. Every option is
   whitelist-validated; every mutation is POST-redirect-GET. The design system is
   documented in [`docs/architecture/DESIGN_TEMPLATE.md`](docs/architecture/DESIGN_TEMPLATE.md).
-- **`ai/`** — `text_to_urls()`, the whole capability behind one function, with four
+- **`retrieval/`** — `text_to_urls()`, the whole capability behind one function, with four
   selectable corpora and a support matrix that decides what each one may be asked;
   plus an eval notebook that measures availability and overlap before you change a
   default.
@@ -131,7 +131,7 @@ URLs come back deduplicated, in ranking order.
 dropped rather than silently ignored — `region` selects a Wikipedia language
 edition, `timelimit` filters OpenAlex and arXiv by publication date, and neither
 `safesearch` nor the engine chain means anything outside `ddgs`. The support matrix
-and the reasoning are in [`ai/README.md`](ai/README.md).
+and the reasoning are in [`retrieval/README.md`](retrieval/README.md).
 
 ## The ~8-week lifecycle
 
@@ -148,7 +148,7 @@ T2URL is **⚠️ incomplete at the Harden gate**, stated here rather than disco
 a review:
 
 - The retrieval model card has **no dated evaluation run** — run
-  `ai/notebooks/retrieval_eval.ipynb`.
+  `retrieval/notebooks/eval.ipynb`.
 - `raw_searches` has **no row-level retention policy**. Iceberg snapshot expiry
   governs time travel, not rows.
 - `ingress_cidrs` still defaults to `0.0.0.0/0` — fine for a sandbox, wrong anywhere

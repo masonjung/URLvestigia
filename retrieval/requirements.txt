@@ -1,5 +1,5 @@
 # AI layer dependencies.
-#   pip install -r ai/requirements.txt
+#   pip install -r retrieval/requirements.txt
 #
 # Retrieval only. No web framework, no database driver — this layer is
 # importable and testable with nothing else installed.

@@ -19,7 +19,7 @@ failure now saves you debugging the wrong thing in step 3.
 
 ---
 
-## 1. The AI layer, on its own
+## 1. The retrieval layer, on its own
 
 The capability, with no server and no database:
 
@@ -35,7 +35,7 @@ for url in text_to_urls("Cloudera CDP supports use cases", max_results=16):
     print(url)
 ```
 
-That is the whole AI layer's public surface. **This call hits a live search engine** —
+That is the whole retrieval layer's public surface. **This call hits a live search engine** —
 if it returns nothing, an engine is throttling you, which is exactly the failure mode
 the fallback chain exists for:
 
@@ -43,7 +43,7 @@ the fallback chain exists for:
 text_to_urls("Cloudera CDP use cases", backend="duckduckgo,yahoo,startpage")
 ```
 
-`ddgs` tries each in order and stops once it has enough. → [`ai/README.md`](../ai/README.md)
+`ddgs` tries each in order and stops once it has enough. → [`retrieval/README.md`](../retrieval/README.md)
 
 ---
 

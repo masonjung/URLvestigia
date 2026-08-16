@@ -91,7 +91,7 @@ where retention and lineage apply. Neither replaces the other.
   that produced them. It does not fetch, cache, or persist the pages themselves.
   This is a governance commitment, not an implementation detail — see
   [`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md).
-- **`db.py` owns every statement.** If SQL appears in `app/` or `ai/`, it is in the
+- **`db.py` owns every statement.** If SQL appears in `app/` or `retrieval/`, it is in the
   wrong file.
 - **Deletes cascade.** `search_urls.search_id` is a `REFERENCES … ON DELETE CASCADE`
   foreign key and `db.py` enables `PRAGMA foreign_keys = ON` on every connection —

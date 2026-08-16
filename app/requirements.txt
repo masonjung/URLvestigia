@@ -7,7 +7,7 @@
 #
 # The Lakehouse layer (data/db.py) needs nothing — sqlite3 is stdlib.
 
--r ../ai/requirements.txt
+-r ../retrieval/requirements.txt
 
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0

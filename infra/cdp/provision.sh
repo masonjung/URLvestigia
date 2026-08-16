@@ -106,7 +106,7 @@ run cdp de create-vc \
   --spark-version SPARK3
 
 # --- 3. AI Workbench -------------------------------------------------------
-# Hosts the Serve layer as an Application, and ai/notebooks/ as sessions.
+# Hosts the Serve layer as an Application, and retrieval/notebooks/ as sessions.
 step "3/5  AI Workbench (Serve layer host)"
 run cdp ml create-workspace \
   --workspace-name "${AI_WORKBENCH}" \

@@ -100,7 +100,7 @@ resource "cdp_de_virtual_cluster" "t2url" {
 }
 
 # --- AI + Serve layers -----------------------------------------------------
-# Hosts ai/notebooks/ as sessions and app/ as a long-running Application.
+# Hosts retrieval/notebooks/ as sessions and app/ as a long-running Application.
 
 resource "cdp_ml_workspace" "t2url" {
   workspace_name   = local.ai_workbench

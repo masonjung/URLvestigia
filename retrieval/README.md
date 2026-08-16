@@ -1,7 +1,11 @@
-# `ai/` — AI layer
+# `retrieval/` — text in, ranked URLs out
 
-Text in, ranked URLs out. This is the layer that does the actual discovery work;
-everything else stores, processes, or displays what this layer returns.
+This is the layer that does the actual discovery work; everything else stores,
+processes, or displays what this layer returns.
+
+It fills the Forge reference stack's **AI** slot, but it is named for what it holds:
+keyword retrieval against four corpora. There is no model here and no inference — see
+the note in [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#layer-by-layer).
 
 ## What's here
 
@@ -9,7 +13,7 @@ everything else stores, processes, or displays what this layer returns.
 |---|---|
 | `t2url.py` | The retrieval façade — dispatch, dedupe, and the `ddgs` path |
 | `providers.py` | The support matrix, the one HTTP seam, and the Wikipedia / OpenAlex / arXiv providers |
-| `notebooks/retrieval_eval.ipynb` | Coverage / overlap evaluation, run before changing defaults |
+| `notebooks/eval.ipynb` | Coverage / overlap evaluation, run before changing defaults |
 | `requirements.txt` | One dependency: `ddgs`. No web framework, no database driver, no HTTP library. |
 
 ## The capability
@@ -107,7 +111,7 @@ the common case.
 
 Only four engines are exposed in the UI. ddgs also supports google, brave, and
 mojeek, but they are blocked or return empty too often to be a dependable default.
-Re-check with `notebooks/retrieval_eval.ipynb` before promoting one.
+Re-check with `notebooks/eval.ipynb` before promoting one.
 
 **Across providers there is no chain, and that is deliberate.** Fall-through assumes
 the sources are substitutes. These are different corpora, so falling through from a

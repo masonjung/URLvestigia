@@ -1,4 +1,4 @@
-"""AI layer — unit tests for `ai/t2url.py`.
+"""AI layer — unit tests for `retrieval/t2url.py`.
 
 Every test stubs `DDGS`. These verify the contract T2URL guarantees about search
 results, not whether a search engine is up.

@@ -140,7 +140,7 @@ Cloudera tool automates it — **read those first**, then fill each one in.
 
 1. \`docs/\` — write the business case and the architecture before any code.
 2. \`data/\` — model the tables. Everything downstream depends on this shape.
-3. \`ai/\` — the capability that makes this an accelerator rather than a dashboard.
+3. \`retrieval/\` — the capability that makes this an accelerator rather than a dashboard.
 4. \`app/\` — the Serve layer a stakeholder actually opens.
 5. \`governance/\` — classify the data **before** you store it, not after.
 6. \`tests/\` — the Harden gate. Nothing ships until this is green.

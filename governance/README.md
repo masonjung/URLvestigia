@@ -64,7 +64,7 @@ Stated here rather than discovered at a customer review:
   `user_id` for multi-tenancy changes the posture materially — the checklist for
   that is in `DATA_CLASSIFICATION.md`.
 - **The retrieval model card has no recorded evaluation.** Due at the Harden gate;
-  run `ai/notebooks/retrieval_eval.ipynb`.
+  run `retrieval/notebooks/eval.ipynb`.
 
 ## Which Cloudera tool automates it
 

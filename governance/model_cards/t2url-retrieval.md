@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Component** | `ai/t2url.py` → `text_to_urls()`, dispatching to `ai/providers.py` |
+| **Component** | `retrieval/t2url.py` → `text_to_urls()`, dispatching to `retrieval/providers.py` |
 | **Version** | Tracked by git commit; no separate model version |
 | **Owner** | Accelerator owner (see [`docs/GATES.md`](../../docs/GATES.md)) |
 | **Status** | Reference implementation, not customer-deployed |
@@ -49,7 +49,7 @@ is reproducible.
 `app/server.py` before it reaches this component.
 
 One search uses one provider. The four options above the first two are **not
-universally supported**, and the support matrix in `ai/providers.py` is what decides:
+universally supported**, and the support matrix in `retrieval/providers.py` is what decides:
 
 | Provider | Corpus | `region` | `timelimit` | `safesearch` | `backend` |
 |---|---|---|---|---|---|
@@ -81,7 +81,7 @@ and is the component's most important failure mode.
 | **Selected engines are not all consulted** | ddgs submits engines concurrently and appears to drop results from any that do not return inside its first wait. Observed 2026-08-09: `yahoo` alone gave 7 URLs, `startpage` alone gave 10, `yahoo,startpage` gave 7. Selecting more engines is not reliably more coverage. | Measure with the eval notebook rather than assuming; the behaviour is ddgs's, not this repo's, and is documented in `docs/ARCHITECTURE.md` |
 | **Correlated failure across the `ddgs` chain** | The four web engines are reached by one mechanism — requesting public result pages. Rate limiting, IP blocking, and markup changes hit all four together, so a chain of four is not four independent chances. A datacenter egress IP is the profile these engines block hardest, so a search that works on a laptop can return `[]` from a CML session. | The three API providers do not share the mechanism and are not blocked by IP reputation. Selecting one is the mitigation; per-provider availability is measured in the live test tier |
 | **Corpus mismatch** | A provider answers only from its own corpus. arXiv has no opinion on a product question and Wikipedia none on a preprint. An unhelpful answer looks identical to an unavailable one. | Providers are a user-visible choice, not a silent fallback: nothing re-routes a query to a different corpus. The provider is recorded on every search |
-| **Third-party ranking bias** | Ranking encodes commercial SEO and each provider's own editorial choices. T2URL inherits all of it and cannot inspect it. | Multi-engine chain and multi-provider choice reduce single-source dependence; overlap measured in `ai/notebooks/retrieval_eval.ipynb` |
+| **Third-party ranking bias** | Ranking encodes commercial SEO and each provider's own editorial choices. T2URL inherits all of it and cannot inspect it. | Multi-engine chain and multi-provider choice reduce single-source dependence; overlap measured in `retrieval/notebooks/eval.ipynb` |
 | **Geographic and language skew** | `region` materially changes results; `wt-wt` default skews English. For Wikipedia it selects the language edition, which is a different corpus rather than a different ranking of the same one. | Region is user-selectable and recorded per search — as `NULL` where the provider does not apply it |
 | **Options that do not apply** | A UI that offers a time window to a corpus with no date filter would record a filter that never ran | Support matrix drives the call, the persisted record, and which controls render. Unsupported options are stored `NULL`; asserted by `tests/test_server.py::test_unsupported_options_are_stored_null_not_as_posted` |
 | **Non-reproducibility** | Engines re-rank continuously. The same query tomorrow returns different URLs. | Every search persists its full option set and timestamp, so a result set is explainable even when it is not repeatable |
@@ -92,7 +92,7 @@ and is the component's most important failure mode.
 
 ## Evaluation
 
-Measured by [`ai/notebooks/retrieval_eval.ipynb`](../../ai/notebooks/retrieval_eval.ipynb) —
+Measured by [`retrieval/notebooks/eval.ipynb`](../../retrieval/notebooks/eval.ipynb) —
 availability, mean yield, and pairwise engine overlap.
 
 > **No results recorded yet.** Run the notebook and paste the availability and

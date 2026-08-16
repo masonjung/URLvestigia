@@ -12,9 +12,9 @@ all five layers of the reference stack.
     cdp use      └────────────────┬────────────────────────────┘
     cases"                        │
                  ┌────────────────▼────────────────────────────┐     one provider
-                 │  AI         ai/t2url.py                     │     per search
+                 │  AI         retrieval/t2url.py              │     per search
                  │             text_to_urls()                  │ ──► ddgs ─► DuckDuckGo
-                 │             ai/providers.py                 │     │       Yahoo
+                 │             retrieval/providers.py          │     │       Yahoo
                  │             one corpus per search           │     │       Startpage
                  └────────────────┬────────────────────────────┘     │       Yandex
                                   │ URLs, deduped, rank order        ├─► Wikipedia
@@ -44,11 +44,20 @@ all five layers of the reference stack.
 | Layer | Directory | Component | Cloudera service |
 |---|---|---|---|
 | **Serve** | `app/` | FastAPI + Jinja2 dashboard | Cloudera AI Application |
-| **AI** | `ai/` | `text_to_urls()` — metasearch retrieval | Cloudera AI Workbench |
+| **AI** | `retrieval/` | `text_to_urls()` — metasearch retrieval | Cloudera AI Workbench |
 | **Ingest** | `data/ingest/` | SQLite → Iceberg batch loader | Cloudera Data Engineering |
 | **Lakehouse** | `data/iceberg/` | `raw_searches`, `raw_search_urls`, `curated_urls` | Iceberg on CDW / Data Lake |
 | **Process** | `pipelines/` | URL normalisation and enrichment | Cloudera Data Engineering |
 | **Governance** | `governance/` | Ranger policies, model card, classification | SDX |
+
+**On the AI layer's directory name.** The Forge standard calls this layer `ai/`, and
+T2URL deliberately does not. There is no model here and no inference: the layer is
+keyword retrieval — a dispatch table, four HTTP clients, and an XML parser, on one
+dependency. A directory called `ai/` would claim a capability the code does not have,
+which is the same failure the support matrix in `retrieval/providers.py` exists to
+prevent one control at a time. The layer still fills the standard's AI slot and still
+maps to Cloudera AI Workbench; only the directory is named for its contents. An
+accelerator that does add a model should name the slot back.
 
 ## The request path
 
@@ -106,7 +115,7 @@ mean. Reading `ddgs/ddgs.py` and probing the live library:
 Two consequences the rest of this repo depends on. First, **`backend` records the
 engines *asked*, not the engine that answered** — see the note under *Providers are
 an axis*. Second, selecting more engines is not free extra coverage; measure it with
-`ai/notebooks/retrieval_eval.ipynb` rather than assuming.
+`retrieval/notebooks/eval.ipynb` rather than assuming.
 
 **Providers are an axis, not links in the chain.** The decision above is why
 Wikipedia, OpenAlex, and arXiv are a separate choice rather than four more entries
@@ -134,7 +143,7 @@ aggregation and ranking with ours, at N× the latency. That is the same merge de
 above, and it needs the same ADR.
 
 **A provider only advertises options it applies.** The support matrix in
-`ai/providers.py` is declared once and drives four things: which kwargs reach the
+`retrieval/providers.py` is declared once and drives four things: which kwargs reach the
 provider, which columns are written versus left `NULL`, which controls the template
 renders, and the CSS that hides the rest. Restating it anywhere would let the copies
 drift, and the symptom would be a control that silently does nothing. With no
@@ -151,7 +160,7 @@ aggressive, never less, and
 **Links only, never page content.** Enforced structurally: no HTTP client in this
 repo fetches the content of a result URL. Retrieval reads the URL out of each result
 and discards the rest — including the snippets and abstracts the API providers
-return. `ai/providers.py` has exactly one outbound seam, `_get_bytes`, and it calls
+return. `retrieval/providers.py` has exactly one outbound seam, `_get_bytes`, and it calls
 search and metadata APIs only. Pointing it at a result URL is a classification
 change, not a feature — see
 [`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md).
@@ -163,9 +172,9 @@ remembered.
 ## Where the layering is tested
 
 The Serve layer holds no SQL and no retrieval logic; `data/db.py` holds every
-statement; `ai/t2url.py` has no database and no HTTP handling. The check on that
+statement; `retrieval/t2url.py` has no database and no HTTP handling. The check on that
 claim is concrete: swapping the front-end for React should require no change in
-`ai/`, `data/`, `pipelines/`, or `governance/`.
+`retrieval/`, `data/`, `pipelines/`, or `governance/`.
 
 ## Known constraints
 

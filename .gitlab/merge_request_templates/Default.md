@@ -13,7 +13,7 @@ Closes #
 <!-- Tick every directory this changes. Reviewers use this to know whose eyes
      are needed — a governance/ tick means the accelerator owner reviews too. -->
 
-- [ ] `ai/` — retrieval
+- [ ] `retrieval/` — retrieval
 - [ ] `app/` — Serve layer
 - [ ] `data/` — schema, ingest, Iceberg DDL
 - [ ] `pipelines/` — Spark jobs
@@ -33,10 +33,10 @@ Closes #
 
 <!-- Delete the sections that do not apply. -->
 
-**Changed a retrieval default in `ai/`?**
-- [ ] `ai/notebooks/retrieval_eval.ipynb` run, results dated in
+**Changed a retrieval default in `retrieval/`?**
+- [ ] `retrieval/notebooks/eval.ipynb` run, results dated in
       `governance/model_cards/t2url-retrieval.md`
-- [ ] Defaults table in `ai/README.md` updated
+- [ ] Defaults table in `retrieval/README.md` updated
 
 **Changed a schema in `data/`?**
 - [ ] Added to *both* `schema.sql` and the migration list in `db.init_db()`

@@ -115,7 +115,7 @@ def test_every_ui_provider_is_accepted(client, provider):
 
 
 def test_every_offered_provider_is_implemented():
-    """The UI list may be a subset of what ai/ implements — openalex is implemented
+    """The UI list may be a subset of what retrieval/ implements — openalex is implemented
     but withdrawn from the form — but it can never be a superset. Offering a provider
     with no registry entry would silently search the web under another name, and
     `_pick`'s whitelist would not catch it because the name *is* whitelisted."""

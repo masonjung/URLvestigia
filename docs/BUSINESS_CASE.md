@@ -79,14 +79,14 @@ filling in.
   Iceberg storage measured in megabytes.
 - **To build:** already built.
 - **To adapt:** the reusable part is the structure. A team taking this as a starting
-  point replaces `ai/` and keeps almost everything else.
+  point replaces `retrieval/` and keeps almost everything else.
 
 ## Risks
 
 | Risk | Why it matters | Where it is handled |
 |---|---|---|
 | **Query text leaves the environment** | Public search endpoints, no API key, therefore no data-processing agreement. Disqualifying for some customers. | [`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md#third-party-disclosure) |
-| **Third-party dependency with no contract** | Engines add rate limits and blocks without notice; usage is bounded by their tolerance, not an SLA | Four-engine fallback chain; availability measured in `ai/notebooks/` |
+| **Third-party dependency with no contract** | Engines add rate limits and blocks without notice; usage is bounded by their tolerance, not an SLA | Four-engine fallback chain; availability measured in `retrieval/notebooks/` |
 | **Results are not reproducible** | Engines re-rank continuously | Full option set persisted per search — explainable, not repeatable |
 | **Ranking mistaken for authority** | `best_position` is SEO, not credibility | Stated as out-of-scope in the model card |
 

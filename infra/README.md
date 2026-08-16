@@ -51,7 +51,7 @@ CDP Environment  (identity, networking, SDX)
   └── Data Lake                    → governance, Ranger policies, Atlas lineage
   └── Data Engineering service     → runs data/ingest/ and pipelines/jobs/
         └── virtual cluster "t2url-vc"
-  └── AI Workbench                 → hosts ai/notebooks/ and app/ as an Application
+  └── AI Workbench                 → hosts retrieval/notebooks/ and app/ as an Application
   └── Iceberg database "t2url"     → from data/iceberg/ddl.sql
 ```
 

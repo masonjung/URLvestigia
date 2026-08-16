@@ -15,7 +15,7 @@ repo fetches the content of a result URL.** Any change that adds one is a
 classification change and needs this document updated first.
 
 Since the provider seam was added, that claim needs one distinction drawn precisely.
-`ai/providers.py` does make outbound HTTP requests — to the Wikipedia, OpenAlex, and
+`retrieval/providers.py` does make outbound HTTP requests — to the Wikipedia, OpenAlex, and
 arXiv *metadata* APIs, through a single seam (`_get_json` / `_get_bytes`). Those
 responses contain snippets and abstracts. T2URL reads the URL out of each record and
 discards everything else, exactly as it discards everything but `href` from a `ddgs`
@@ -73,7 +73,7 @@ leaves the customer's environment**, whichever provider is selected.
 There is no API key and no account for any of them, so there is no contractual
 data-processing agreement, and their handling is governed by their own privacy
 policies rather than the customer's. For deployments where query text cannot leave
-the environment, T2URL is not appropriate without swapping `ai/providers.py` for an
+the environment, T2URL is not appropriate without swapping `retrieval/providers.py` for an
 internal index.
 
 The two rows differ in kind, and a reviewer should be told which one they are
@@ -119,7 +119,7 @@ scheduled `DELETE FROM t2url.raw_searches WHERE created_at < …` job added to
 Atlas captures lineage automatically for the Spark paths:
 
 ```
-search engines / metadata APIs → ai/providers.py → ai/t2url.py → SQLite
+search engines / metadata APIs → retrieval/providers.py → retrieval/t2url.py → SQLite
     → data/ingest/load_to_iceberg.py → raw_searches / raw_search_urls
     → pipelines/jobs/url_enrichment.py → curated_urls
 ```

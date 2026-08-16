@@ -7,7 +7,7 @@ Things you run by hand. Nothing here is part of the deployed accelerator.
 | Path | What it does |
 |---|---|
 | `new-accelerator.sh` | Clones this repo into a fresh, re-pointed, git-initialised accelerator |
-| `example.py` | Smallest possible demo of the AI layer — text in, URLs out |
+| `example.py` | Smallest possible demo of the retrieval layer — text in, URLs out |
 
 ## Start a new accelerator
 
@@ -29,7 +29,7 @@ first.
 python scripts/example.py
 ```
 
-Three lines of real usage against the AI layer. This hits a live search engine —
+Three lines of real usage against the retrieval layer. This hits a live search engine —
 it is the fastest way to confirm the accelerator works end to end without starting
 the server.
 
@@ -42,4 +42,4 @@ the server.
   new directory and refuses to clobber, but still supports `--dry-run` because the
   first thing anyone wants is to see what it will do.
 - **POSIX shell, no dependencies.** These run on a laptop before anything is
-  installed. `example.py` needs only `ai/requirements.txt`.
+  installed. `example.py` needs only `retrieval/requirements.txt`.

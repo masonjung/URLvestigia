@@ -52,7 +52,7 @@ help:
 	@echo "  Using: $(PYTHON)"
 
 ## install: install runtime and test dependencies
-# Dependencies live with their layer. app/ pulls in ai/, so these two files are
+# Dependencies live with their layer. app/ pulls in retrieval/, so these two files are
 # the full closure.
 install:
 	$(PYTHON) -m pip install -r app/requirements.txt -r tests/requirements.txt
