@@ -72,6 +72,36 @@ class TestCuratedUrlsAlignment:
         assert "providers" in merged
 
 
+    def test_no_column_accumulates_onto_its_own_previous_value(self):
+        """The nightly CDE run passes no --since, so it re-stages the whole raw
+        table every night. Any SET of the form `target.x = target.x + source.x`
+        therefore counts the same sightings again on every run, and the column
+        drifts by one full recount per day. `times_seen` was exactly this.
+
+        Every other SET is already idempotent by construction -- LEAST, GREATEST,
+        array_distinct -- so this asserts the property the whole block relies on.
+        """
+        set_block = url_enrichment.MERGE_SQL.split("UPDATE SET")[1].split("WHEN")[0]
+        flat = " ".join(set_block.split())
+
+        accumulating = [c for c in staged_aliases()
+                        if f"target.{c} = target.{c} +" in flat]
+        assert accumulating == []
+
+    def test_times_seen_is_derived_from_the_deduplicated_search_ids(self):
+        """The DDL defines `times_seen` as "how many distinct searches returned
+        it", which is exactly the length of `search_ids`. Computing it from that
+        array is what keeps the two from ever disagreeing -- a separate running
+        total can only drift."""
+        set_block = url_enrichment.MERGE_SQL.split("UPDATE SET")[1].split("WHEN")[0]
+        flat = " ".join(set_block.split())
+        expression = flat.split("target.times_seen =")[1].split(", target.")[0]
+
+        assert "size(" in expression
+        assert "array_distinct" in expression
+        assert "search_ids" in expression
+
+
 class TestRawTableAlignment:
     def test_enrichment_reads_columns_the_raw_table_declares(self):
         """The job selects `provider` off raw_search_urls; the DDL must have it."""

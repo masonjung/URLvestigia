@@ -7,6 +7,7 @@ Only links are stored, never page content.
 
 import os
 import sqlite3
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,11 +17,22 @@ DB_PATH = Path(os.environ.get("T2URL_DB") or HERE / "t2url.db")
 _SCHEMA = (HERE / "schema.sql").read_text(encoding="utf-8")
 
 
+@contextmanager
 def _db():
+    """One connection: transaction committed *and* handle closed on exit.
+
+    `sqlite3`'s own context manager commits or rolls back the transaction but
+    leaves the connection open, so `with sqlite3.connect(...)` leaks a handle
+    until garbage collection reclaims it. Wrapping it here keeps every existing
+    `with _db() as conn:` call site unchanged while making the close explicit —
+    which matters most on Windows, where a lingering handle can block the file
+    operations backup() and clear_all() depend on.
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    with closing(conn), conn:
+        yield conn
 
 
 def init_db():
@@ -96,14 +108,12 @@ def backup(dest):
         raise FileExistsError(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    source, target = _db(), sqlite3.connect(dest)
     ok = False
     try:
-        source.backup(target)
+        with _db() as source, closing(sqlite3.connect(dest)) as target:
+            source.backup(target)
         ok = True
     finally:
-        target.close()
-        source.close()
         if not ok:
             # A half-written file must not survive looking like a backup — the
             # next run would refuse to overwrite it and the real one never lands.
@@ -120,28 +130,20 @@ def list_searches(limit=50):
             " FROM searches ORDER BY id DESC LIMIT ?",
             (limit,),
         ).fetchall()
-        return [{
-            "id": r["id"],
-            "query": r["query"],
-            "created_at": r["created_at"],
-            "provider": r["provider"],
-            "region": r["region"],
-            "safesearch": r["safesearch"],
-            "timelimit": r["timelimit"],
-            "backend": r["backend"],
-            "max_results": r["max_results"],
-            "urls": [u["url"] for u in conn.execute(
-                "SELECT url FROM search_urls WHERE search_id = ? ORDER BY position", (r["id"],)
-            )],
-        } for r in rows]
+        # dict(r) carries exactly the columns selected above, so adding one to
+        # the SELECT no longer needs a matching edit here.
+        return [{**dict(r), "urls": [u["url"] for u in conn.execute(
+            "SELECT url FROM search_urls WHERE search_id = ? ORDER BY position", (r["id"],)
+        )]} for r in rows]
 
 
 def stats():
     with _db() as conn:
-        return {
-            "searches": conn.execute("SELECT COUNT(*) FROM searches").fetchone()[0],
-            "urls": conn.execute("SELECT COUNT(*) FROM search_urls").fetchone()[0],
-        }
+        searches, urls = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM searches),"
+            " (SELECT COUNT(*) FROM search_urls)"
+        ).fetchone()
+        return {"searches": searches, "urls": urls}
 
 
 def delete_search(search_id):

@@ -389,10 +389,18 @@
                 title="Delete duplicate URLs across searches, keeping the earliest">Dedupe URLs</button>
             </form>
             <!-- Store sits before Clear all so the one destructive action stays
-                 rightmost and visually separated. -->
+                 rightmost and visually separated. Download sits beside Store
+                 because they are the same snapshot going to two different disks:
+                 Store keeps one on the server, Download hands one to the browser.
+                 A GET form rather than an <a> so the markup — and so the .head-btn
+                 styling — stays identical to every other action here. -->
             <form method="post" action="/store">
               <button id="store" class="head-btn" type="submit"
                 title="Save a dated snapshot of the database to backups/ — never overwrites">Store</button>
+            </form>
+            <form method="get" action="/download">
+              <button id="download" class="head-btn" type="submit"
+                title="Download a snapshot — your browser chooses where it is saved">Download</button>
             </form>
             <form method="post" action="/clear">
               <button id="clear-all" class="head-btn" type="submit">Clear all</button>

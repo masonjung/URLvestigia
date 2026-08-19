@@ -241,6 +241,20 @@ class TestArxiv:
         assert query.startswith("(all:apache iceberg)")
         assert query.index("(all:") < query.index("submittedDate:")
 
+    def test_parentheses_in_the_query_cannot_break_the_grouping(self, http):
+        """The grouping above is only as good as the text dropped inside it. A
+        user's own parenthesis would close the group early, putting the rest of
+        their words — and the AND that follows — outside it, which is the very
+        failure test_multi_word_query_is_grouped exists to prevent."""
+        recorder = http(ARXIV_PAYLOAD)
+        providers.search_arxiv("apache (iceberg) tables", max_results=10,
+                               timelimit="m")
+        query = recorder.calls[0]["params"]["search_query"]
+
+        assert query.startswith("(all:apache iceberg tables)")
+        assert query.count("(") == 1 and query.count(")") == 1
+        assert query.index("(all:") < query.index("submittedDate:")
+
     def test_empty_feed_returns_empty_list(self, http):
         http(b'<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>')
         assert providers.search_arxiv("iceberg", max_results=10) == []

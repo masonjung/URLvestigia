@@ -414,6 +414,70 @@ def test_store_writes_a_snapshot_and_reports_its_contents(client):
     assert "1 searches, 3 URLs" in body
 
 
+# --- download --------------------------------------------------------------
+
+def test_download_returns_the_database_as_an_attachment(client):
+    """`Content-Disposition: attachment` is the entire mechanism — it is what
+    makes the browser offer Save As instead of rendering the bytes. A browser
+    cannot be given a picker for the server's disk, so this is what "choose
+    where it goes" has to mean."""
+    client.post("/search", data={"text": "a"})
+
+    response = client.get("/download")
+
+    assert response.status_code == 200
+    disposition = response.headers["content-disposition"]
+    assert "attachment" in disposition
+    assert "t2url-" in disposition and ".db" in disposition
+    # A real SQLite file, not an error page rendered with a 200.
+    assert response.content.startswith(b"SQLite format 3\x00")
+
+
+def test_download_carries_the_rows(client, temp_db):
+    """Served through db.backup(), so what lands is a consistent snapshot rather
+    than whatever the live file happened to contain mid-write."""
+    import sqlite3
+
+    client.post("/search", data={"text": "downloadable"})
+    payload = client.get("/download").content
+
+    path = temp_db.DB_PATH.parent / "downloaded.db"
+    path.write_bytes(payload)
+    conn = sqlite3.connect(path)
+    try:
+        assert conn.execute("SELECT query FROM searches").fetchone()[0] == "downloadable"
+    finally:
+        conn.close()
+
+
+def test_download_leaves_no_file_in_the_backups_directory(client):
+    """Store owns backups/. Downloading must not add a file there on every click —
+    the snapshot it sends is temporary and deleted once the response is out."""
+    before = set(server.backup.DEFAULT_DIR.glob("t2url-*.db"))
+    client.post("/search", data={"text": "a"})
+
+    client.get("/download")
+
+    assert set(server.backup.DEFAULT_DIR.glob("t2url-*.db")) == before
+
+
+def test_download_before_any_search_explains_itself(client, temp_db):
+    """No store on disk yet: a bare 500 would tell the user nothing.
+
+    The redirect is read from the Location header rather than followed — with the
+    database file gone, rendering `/` would fail on its own, which is a different
+    situation than the one under test.
+    """
+    from urllib.parse import unquote
+
+    temp_db.DB_PATH.unlink(missing_ok=True)
+
+    response = client.get("/download", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert "nothing to download" in unquote(response.headers["location"])
+
+
 def test_store_leaves_the_live_table_untouched(client):
     """Storing is the one header action that changes nothing in the store — the
     guarantee that makes it safe to sit beside Clear all."""

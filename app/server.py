@@ -4,7 +4,9 @@ Run:  make dev   (or: uvicorn app.server:app --reload)
 then open http://127.0.0.1:8000/
 """
 
+import shutil
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -18,8 +20,9 @@ import backup
 import db
 import t2url
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
 
 app = FastAPI(title="URLoom")
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
@@ -212,12 +215,62 @@ def store():
                      f"{rows['search_urls']} URLs.")
 
 
+@app.get("/download")
+def download():
+    """Hand the browser a snapshot so the *browser* chooses where it lands.
+
+    "Pick the folder" cannot mean a directory picker for the server's disk: no
+    browser exposes one, and a web form that chooses arbitrary write paths on the
+    host would be a hole rather than a feature. It stays wrong once `deploy.sh
+    app` puts this behind Cloudera AI, where the server's disk is a container
+    nobody is sitting at. Sending the file instead moves the choice to the Save As
+    dialog, which is the machine the user actually wanted all along.
+
+    Deliberately not a redirect to a stored snapshot: Store is a server-side
+    backup that is never overwritten, and downloading must not litter backups/
+    with a file per click. This writes to a temp directory that the response
+    deletes once it has been sent.
+
+    Written through db.backup() rather than served from DB_PATH directly, for the
+    reason that function documents — the app holds the database open, so shipping
+    the live file could transmit a torn page.
+    """
+    tmp_dir = Path(tempfile.mkdtemp(prefix="t2url-download-"))
+    cleanup = BackgroundTask(shutil.rmtree, tmp_dir, ignore_errors=True)
+    try:
+        snapshot = db.backup(tmp_dir / backup.default_name())
+    except FileNotFoundError:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return _redirect("Error: nothing to download yet — run a search first.")
+    except Exception as exc:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return _redirect(f"Error: download failed — {exc}")
+    # `filename` is what sets Content-Disposition: attachment, which is the whole
+    # mechanism — without it a browser renders the bytes instead of saving them.
+    return FileResponse(snapshot, media_type="application/vnd.sqlite3",
+                        filename=snapshot.name, background=cleanup)
+
+
 @app.post("/dedupe")
 def dedupe():
+    """Collapse duplicate URLs, and say so when searches went with them.
+
+    `db.dedupe_urls()` also deletes any search left holding no URLs, and that is
+    the part worth naming: a search record is the artifact this app exists to
+    keep, so a button labelled "dedupe URLs" must not remove one silently. The
+    count is taken either side of the call rather than returned, which leaves
+    dedupe_urls()'s contract -- the number of URL rows removed -- untouched.
+    """
+    before = db.stats()["searches"]
     removed = db.dedupe_urls()
     if not removed:
         return _redirect("No duplicate URLs found.")
-    return _redirect(f'Removed {removed} duplicate URL{"" if removed == 1 else "s"}.')
+    msg = f'Removed {removed} duplicate URL{"" if removed == 1 else "s"}'
+    searches = before - db.stats()["searches"]
+    if searches:
+        msg += (f' and {searches} search{"" if searches == 1 else "es"} '
+                "left with none")
+    return _redirect(msg + ".")
 
 
 @app.post("/clear")

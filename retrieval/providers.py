@@ -234,7 +234,14 @@ def search_arxiv(text, *, max_results, timelimit=None, **_ignored):
     # multi-word query comes back silently unfiltered — "the past month" returning
     # 2013 papers, with nothing in the response to say the filter was dropped.
     # Verified against the live API; see test_multi_word_query_is_grouped.
-    query = f"(all:{text})"
+    #
+    # A parenthesis in the user's own text would close that group early and leave
+    # the rest of their words outside it — reintroducing the exact bug the
+    # grouping exists to prevent, for any query containing one. `all:` matches
+    # terms rather than sub-expressions, so dropping them removes nothing a
+    # search could have used.
+    terms = " ".join(text.replace("(", " ").replace(")", " ").split())
+    query = f"(all:{terms})"
     since = _since(timelimit)
     if since:
         now = datetime.now(timezone.utc)

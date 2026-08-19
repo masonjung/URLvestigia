@@ -116,7 +116,17 @@ class TestBackup:
 
         class ExplodingSource:
             """Stands in for the source connection; `sqlite3.Connection` is a C
-            type and its methods cannot be patched."""
+            type and its methods cannot be patched.
+
+            `db._db()` is a context manager, so the stub is one too — it is
+            substituted for that function, not for the connection it yields.
+            """
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
 
             def backup(self, target, **kwargs):
                 seen["dest_existed"] = dest.exists()

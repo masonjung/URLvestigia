@@ -78,6 +78,16 @@ def url_parts(url):
 
 # The MERGE is expressed as SQL rather than a DataFrame write so the dry run can
 # print exactly what will execute — no hidden plan.
+#
+# Every SET below is idempotent: LEAST/GREATEST for the bounds, array_distinct for
+# the collections, and `times_seen` derived from the deduplicated `search_ids`
+# rather than summed. It has to be. The CDE schedule runs this job nightly with no
+# --since (pipelines/cde/url_enrichment.job.yaml), so every run re-stages the whole
+# raw table; `target.times_seen + source.times_seen` counted the same sightings
+# again every night, and the column drifted away from its own DDL definition --
+# "how many distinct searches returned it" -- by one full recount per day.
+# size(array_distinct(...)) restates that definition in the SQL, so a re-run, an
+# overlapping --since backfill, and a retry after a failure all converge.
 MERGE_SQL = """
 MERGE INTO {prefix}.curated_urls AS target
 USING staged_urls AS source
@@ -85,7 +95,8 @@ USING staged_urls AS source
  WHEN MATCHED THEN UPDATE SET
       target.last_seen     = GREATEST(target.last_seen, source.last_seen),
       target.first_seen    = LEAST(target.first_seen, source.first_seen),
-      target.times_seen    = target.times_seen + source.times_seen,
+      target.times_seen    = size(array_distinct(
+                                 concat(target.search_ids, source.search_ids))),
       target.best_position = LEAST(target.best_position, source.best_position),
       target.search_ids    = array_distinct(
                                  concat(target.search_ids, source.search_ids)),
