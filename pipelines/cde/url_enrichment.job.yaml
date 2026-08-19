@@ -1,8 +1,8 @@
-# Cloudera Data Engineering job definition — T2URL URL enrichment.
+# Cloudera Data Engineering job definition — URLvestigia URL enrichment.
 #
 # Apply with the CDE CLI (the cluster endpoint comes from `cde profile`):
-#   cde resource create --name t2url-jobs
-#   cde resource upload --name t2url-jobs \
+#   cde resource create --name urlvestigia-jobs
+#   cde resource upload --name urlvestigia-jobs \
 #       --local-path pipelines/jobs/url_enrichment.py
 #   cde job import --file pipelines/cde/url_enrichment.job.yaml
 #
@@ -12,9 +12,9 @@ apiVersion: cde.cloudera.com/v1
 kind: Job
 
 jobs:
-  - name: t2url-url-enrichment
+  - name: urlvestigia-url-enrichment
     type: spark
-    # Runs after ingest lands the day's searches. Daily is right for T2URL's
+    # Runs after ingest lands the day's searches. Daily is right for URLvestigia's
     # volume; move to hourly only when the ingest cadence justifies it.
     schedule:
       enabled: true
@@ -29,9 +29,9 @@ jobs:
         - "--catalog"
         - "spark_catalog"
         - "--database"
-        - "t2url"
+        - "urlvestigia"
         - "--execute"
-      # T2URL's tables are small. These sizes are deliberately modest — raise
+      # URLvestigia's tables are small. These sizes are deliberately modest — raise
       # them from measured spill, not from optimism.
       driverCores: 1
       driverMemory: "2g"
@@ -47,10 +47,10 @@ jobs:
         spark.sql.adaptive.enabled: "true"
         spark.sql.adaptive.coalescePartitions.enabled: "true"
     mounts:
-      - resourceName: t2url-jobs
+      - resourceName: urlvestigia-jobs
     logRetentionPolicy:
       retentionDays: 30
 
 resources:
-  - name: t2url-jobs
+  - name: urlvestigia-jobs
     type: files

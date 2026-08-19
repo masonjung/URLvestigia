@@ -51,7 +51,7 @@ NAME="cloudera-forge-${VERTICAL}-${USECASE}"
 DEST="${DEST_PARENT}/${NAME}"
 
 # Directories whose contents are this accelerator's worked example. The README.md
-# in each is the standard and is always kept; everything else is T2URL's own code.
+# in each is the standard and is always kept; everything else is URLvestigia's own code.
 EXAMPLE_DIRS=(retrieval app data pipelines governance infra tests)
 
 step() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }
@@ -90,7 +90,7 @@ else
 fi
 
 # --- 2. Clear the worked example -------------------------------------------
-# The new accelerator inherits the structure and the guidance, not T2URL's code.
+# The new accelerator inherits the structure and the guidance, not URLvestigia's code.
 step "2/5  Clear the worked example, keep every README.md"
 for dir in "${EXAMPLE_DIRS[@]}"; do
   if $DRY_RUN; then
@@ -104,22 +104,22 @@ run rm -f "${DEST}/scripts/example.py"
 # --- 3. Re-point the name --------------------------------------------------
 step "3/5  Re-point the accelerator name"
 if $DRY_RUN; then
-  echo "    rewrite T2URL → ${NAME} across *.md, Makefile, .cicd/, .gitlab/"
-  echo "    rewrite t2url-dev → ${VERTICAL}-${USECASE}-dev"
+  echo "    rewrite URLvestigia → ${NAME} across *.md, Makefile, .cicd/, .gitlab/"
+  echo "    rewrite urlvestigia-dev → ${VERTICAL}-${USECASE}-dev"
 else
   # -print0/-0 so a path with a space cannot split the argument list.
   find "$DEST" -type f \( -name '*.md' -o -name 'Makefile' -o -name '*.yml' \
        -o -name '*.sh' -o -name '*.tf' \) -print0 \
     | xargs -0 sed -i.bak \
         -e "s/cloudera-forge-<vertical>-<usecase>/${NAME}/g" \
-        -e "s/t2url-dev/${VERTICAL}-${USECASE}-dev/g" \
-        -e "s/\bT2URL\b/${NAME}/g"
+        -e "s/urlvestigia-dev/${VERTICAL}-${USECASE}-dev/g" \
+        -e "s/\bURLvestigia\b/${NAME}/g"
   find "$DEST" -name '*.bak' -delete
 fi
 
 # --- 4. A README and catalog metadata that say what to do next --------------
 # METADATA.yaml is rewritten rather than sed-re-pointed: the step above only
-# rewrites the *name*, and a catalog entry that inherited T2URL's slug,
+# rewrites the *name*, and a catalog entry that inherited URLvestigia's slug,
 # description, tags, and GitHub link while carrying a new name is worse than an
 # empty one — it looks filled in.
 step "4/5  Write a starting README and METADATA.yaml"

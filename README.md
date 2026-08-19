@@ -1,4 +1,4 @@
-# T2URL — Cloudera Forge Accelerator
+# URLvestigia — Cloudera Forge Accelerator
 
 **Natural-language text in, a governed table of URLs out.** Type a question, get a
 persisted list of source links — with the query, provider, engines, region, and time
@@ -41,7 +41,7 @@ Nothing in this repo changes a remote system without an explicit `--execute`.
 ## The standard repo
 
 ```
-T2URL/
+URLvestigia/
 ├── docs/         architecture · business case          → operating model + design system
 ├── infra/        IaC — CDP CLI / Terraform             → one-time platform provisioning
 ├── data/         SQLite dev store · Iceberg DDL        → Ingest + Lakehouse layers
@@ -69,7 +69,7 @@ and which Cloudera API/tool automates it.
    app/server.py ──── whitelists every option, clamps max_results to 1–50
         │
         ▼
-   retrieval/t2url.py ────── one provider per search:
+   retrieval/urlvestigia.py ────── one provider per search:
         │             ddgs → DuckDuckGo · Yahoo · Startpage · Yandex
         │                    fallback chain: a throttled engine doesn't fail it
         │             wikipedia · openalex · arxiv → their own keyless APIs
@@ -82,7 +82,7 @@ and which Cloudera API/tool automates it.
                                                 normalise · dedupe · enrich
                                                         │
                                                         ▼
-                                                t2url.curated_urls
+                                                urlvestigia.curated_urls
 ```
 
 Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -116,7 +116,7 @@ Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 ## Use the library directly
 
 ```python
-from t2url import text_to_urls
+from urlvestigia import text_to_urls
 
 urls = text_to_urls("best python web scraping libraries", max_results=10)
 ```
@@ -144,7 +144,7 @@ complexity.
 
 ## Status — read before deploying
 
-T2URL is **⚠️ incomplete at the Harden gate**, stated here rather than discovered in
+URLvestigia is **⚠️ incomplete at the Harden gate**, stated here rather than discovered in
 a review:
 
 - The retrieval model card has **no dated evaluation run** — run
@@ -163,7 +163,7 @@ whose data cannot leave. See
 ## Storage
 
 Two tiers, one schema shape. **SQLite** for local development — a single file at
-`data/t2url.db`, moved with the `T2URL_DB` environment variable — and **Apache
+`data/urlvestigia.db`, moved with the `URLVESTIGIA_DB` environment variable — and **Apache
 Iceberg** for the platform. SQLite is not a placeholder: an accelerator has to run on
 a laptop before any CDP environment exists.
 [`data/ingest/load_to_iceberg.py`](data/ingest/load_to_iceberg.py) is the bridge.

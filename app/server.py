@@ -1,4 +1,4 @@
-"""T2URL Serve layer — everything is rendered server-side, no JavaScript.
+"""URLvestigia Serve layer — everything is rendered server-side, no JavaScript.
 
 Run:  make dev   (or: uvicorn app.server:app --reload)
 then open http://127.0.0.1:8000/
@@ -18,20 +18,20 @@ sys.path.insert(0, str(ROOT / "data"))
 
 import backup
 import db
-import t2url
+import urlvestigia
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
-app = FastAPI(title="URLoom")
+app = FastAPI(title="URLvestigia")
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 db.init_db()
 
 # Allowed values per search option; first entry is the default fallback.
 #
 # `provider` currently offers every corpus retrieval/ implements, but it stays a
-# whitelist rather than a mirror of t2url.REGISTRY — the two are allowed to
+# whitelist rather than a mirror of urlvestigia.REGISTRY — the two are allowed to
 # diverge. Anything not listed here is coerced back to the default by _pick(), so
 # a provider withheld from the UI cannot be reached by posting it by hand either.
 OPTIONS = {
@@ -73,7 +73,7 @@ def _providers():
         "id": name,
         "label": PROVIDER_LABELS.get(name, name),
         "unsupported": [opt for opt in TOGGLEABLE
-                        if opt not in t2url.supports(name)],
+                        if opt not in urlvestigia.supports(name)],
     } for name in OPTIONS["provider"]]
 
 
@@ -91,7 +91,7 @@ def _when(iso):
 def _rel(path):
     """Repo-relative when the path is inside the repo, absolute when it is not.
 
-    `T2URL_DB` and `T2URL_BACKUP_DIR` can both point anywhere, so neither label
+    `URLVESTIGIA_DB` and `URLVESTIGIA_BACKUP_DIR` can both point anywhere, so neither label
     can assume it is showing something under ROOT.
     """
     try:
@@ -149,7 +149,7 @@ def search(
     try:
         # Every option is passed; text_to_urls drops the ones this provider does
         # not apply, reading the same matrix used below.
-        urls = t2url.text_to_urls(
+        urls = urlvestigia.text_to_urls(
             text,
             provider=provider,
             max_results=max_results,
@@ -172,7 +172,7 @@ def search(
     # Record only what this provider actually applied. An unsupported option is
     # stored NULL rather than as the value the form happened to post — a Wikipedia
     # search stamped timelimit="w" would claim a filter that never ran.
-    supported = t2url.supports(provider)
+    supported = urlvestigia.supports(provider)
     chosen = {"region": region, "safesearch": safesearch,
               "timelimit": timelimit, "backend": backend}
     db.save_search(
@@ -235,7 +235,7 @@ def download():
     reason that function documents — the app holds the database open, so shipping
     the live file could transmit a torn page.
     """
-    tmp_dir = Path(tempfile.mkdtemp(prefix="t2url-download-"))
+    tmp_dir = Path(tempfile.mkdtemp(prefix="urlvestigia-download-"))
     cleanup = BackgroundTask(shutil.rmtree, tmp_dir, ignore_errors=True)
     try:
         snapshot = db.backup(tmp_dir / backup.default_name())

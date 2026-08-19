@@ -3,7 +3,7 @@
 The dev store is gitignored and lives at a single path, so the searches it holds
 exist in exactly one place on one disk. This writes a dated second copy:
 
-    python data/backup.py                      # -> backups/t2url-<utc>.db
+    python data/backup.py                      # -> backups/urlvestigia-<utc>.db
     python data/backup.py --dir /d/archive     # somewhere else on this device
     python data/backup.py --dest my-snap.db    # an exact filename
 
@@ -13,7 +13,7 @@ creates a new local file and refuses to overwrite one, so there is nothing to
 guard against.
 
 Restoring is a file copy in the other direction, with the server stopped — or
-point the app at the snapshot directly with `T2URL_DB=<path> make dev`.
+point the app at the snapshot directly with `URLVESTIGIA_DB=<path> make dev`.
 """
 
 import argparse
@@ -30,16 +30,16 @@ import db  # noqa: E402
 
 ROOT = HERE.parent
 # Where a snapshot lands when no path is given. Read from the environment like
-# T2URL_DB, so the Store button in the app can be pointed at an external drive
+# URLVESTIGIA_DB, so the Store button in the app can be pointed at an external drive
 # without a code change; resolved once at import, so set it before the process
 # starts.
-DEFAULT_DIR = Path(os.environ.get("T2URL_BACKUP_DIR") or ROOT / "backups")
+DEFAULT_DIR = Path(os.environ.get("URLVESTIGIA_BACKUP_DIR") or ROOT / "backups")
 
 
 def default_name(now=None):
-    """`t2url-20260811-145233.db` — UTC, so the ordering survives a DST change."""
+    """`urlvestigia-20260811-145233.db` — UTC, so the ordering survives a DST change."""
     now = now or datetime.now(timezone.utc)
-    return f"t2url-{now:%Y%m%d-%H%M%S}.db"
+    return f"urlvestigia-{now:%Y%m%d-%H%M%S}.db"
 
 
 def snapshot(directory=None):
@@ -89,7 +89,7 @@ def main(argv=None):
     rows = counts(written)
     # Output stays ASCII: this runs on a Windows console whose default cp1252
     # codec raises on characters like U+2192.
-    print("T2URL backup")
+    print("URLvestigia backup")
     print(f"  source   {db.DB_PATH}")
     print(f"  snapshot {written.resolve()}")
     print(f"  size     {written.stat().st_size:,} bytes")

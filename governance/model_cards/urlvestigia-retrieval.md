@@ -1,8 +1,8 @@
-# Model card — T2URL retrieval
+# Model card — URLvestigia retrieval
 
 | | |
 |---|---|
-| **Component** | `retrieval/t2url.py` → `text_to_urls()`, dispatching to `retrieval/providers.py` |
+| **Component** | `retrieval/urlvestigia.py` → `text_to_urls()`, dispatching to `retrieval/providers.py` |
 | **Version** | Tracked by git commit; no separate model version |
 | **Owner** | Accelerator owner (see [`docs/GATES.md`](../../docs/GATES.md)) |
 | **Status** | Reference implementation, not customer-deployed |
@@ -11,7 +11,7 @@
 ## What this is, and what it is not
 
 **It is a metasearch client, not a trained model.** There are no weights, no
-training data, no fine-tuning, and no inference of the customer's own. T2URL sends
+training data, no fine-tuning, and no inference of the customer's own. URLvestigia sends
 a query to a third-party search service and returns the URLs it ranks — to web
 engines through the `ddgs` library, or to the Wikipedia, OpenAlex, and arXiv APIs
 directly.
@@ -34,7 +34,7 @@ is reproducible.
 **Out of scope, explicitly:**
 
 - **Exhaustive retrieval.** Results are what a public engine ranked in the top N.
-  Absence of a URL is not evidence the page does not exist. Never use T2URL output
+  Absence of a URL is not evidence the page does not exist. Never use URLvestigia output
   to conclude "there is no such document."
 - **Ranking as authority.** `best_position` reflects engine SEO ranking, not
   credibility, recency, or correctness.
@@ -81,13 +81,13 @@ and is the component's most important failure mode.
 | **Selected engines are not all consulted** | ddgs submits engines concurrently and appears to drop results from any that do not return inside its first wait. Observed 2026-08-09: `yahoo` alone gave 7 URLs, `startpage` alone gave 10, `yahoo,startpage` gave 7. Selecting more engines is not reliably more coverage. | Measure with the eval notebook rather than assuming; the behaviour is ddgs's, not this repo's, and is documented in `docs/ARCHITECTURE.md` |
 | **Correlated failure across the `ddgs` chain** | The four web engines are reached by one mechanism — requesting public result pages. Rate limiting, IP blocking, and markup changes hit all four together, so a chain of four is not four independent chances. A datacenter egress IP is the profile these engines block hardest, so a search that works on a laptop can return `[]` from a CML session. | The three API providers do not share the mechanism and are not blocked by IP reputation. Selecting one is the mitigation; per-provider availability is measured in the live test tier |
 | **Corpus mismatch** | A provider answers only from its own corpus. arXiv has no opinion on a product question and Wikipedia none on a preprint. An unhelpful answer looks identical to an unavailable one. | Providers are a user-visible choice, not a silent fallback: nothing re-routes a query to a different corpus. The provider is recorded on every search |
-| **Third-party ranking bias** | Ranking encodes commercial SEO and each provider's own editorial choices. T2URL inherits all of it and cannot inspect it. | Multi-engine chain and multi-provider choice reduce single-source dependence; overlap measured in `retrieval/notebooks/eval.ipynb` |
+| **Third-party ranking bias** | Ranking encodes commercial SEO and each provider's own editorial choices. URLvestigia inherits all of it and cannot inspect it. | Multi-engine chain and multi-provider choice reduce single-source dependence; overlap measured in `retrieval/notebooks/eval.ipynb` |
 | **Geographic and language skew** | `region` materially changes results; `wt-wt` default skews English. For Wikipedia it selects the language edition, which is a different corpus rather than a different ranking of the same one. | Region is user-selectable and recorded per search — as `NULL` where the provider does not apply it |
 | **Options that do not apply** | A UI that offers a time window to a corpus with no date filter would record a filter that never ran | Support matrix drives the call, the persisted record, and which controls render. Unsupported options are stored `NULL`; asserted by `tests/test_server.py::test_unsupported_options_are_stored_null_not_as_posted` |
 | **Non-reproducibility** | Engines re-rank continuously. The same query tomorrow returns different URLs. | Every search persists its full option set and timestamp, so a result set is explainable even when it is not repeatable |
 | **Availability drift** | Engines add rate limits and blocks without notice | Re-run the eval notebook before changing defaults; treat availability as a monitored property |
-| **No content safety on targets** | `safesearch` is applied by the engine; T2URL does not inspect the pages. **Only `ddgs` supports it at all** — the three API providers have no equivalent, and their corpora are curated rather than open web. | Defaults to `moderate` where supported, `NULL` where not; never fetches page content |
-| **Politeness obligations** | Wikipedia, OpenAlex, and arXiv publish rate-limit and identification expectations. Ignoring them looks like a broken provider, not a blocked one. | `T2URL_CONTACT` sets the `User-Agent` and OpenAlex `mailto`; unset degrades to the anonymous pool rather than failing |
+| **No content safety on targets** | `safesearch` is applied by the engine; URLvestigia does not inspect the pages. **Only `ddgs` supports it at all** — the three API providers have no equivalent, and their corpora are curated rather than open web. | Defaults to `moderate` where supported, `NULL` where not; never fetches page content |
+| **Politeness obligations** | Wikipedia, OpenAlex, and arXiv publish rate-limit and identification expectations. Ignoring them looks like a broken provider, not a blocked one. | `URLVESTIGIA_CONTACT` sets the `User-Agent` and OpenAlex `mailto`; unset degrades to the anonymous pool rather than failing |
 | **Yandex data residency** | Operated from Russia; excluded by some customers' rules | Off by default in the UI |
 
 ## Evaluation
@@ -143,7 +143,7 @@ the request that goes out rather than the results that come back.
 
 ## Ethical and operational considerations
 
-T2URL queries public endpoints without an API key or account. That makes it free to
+URLvestigia queries public endpoints without an API key or account. That makes it free to
 run and free of vendor lock-in; it also means usage is bounded by each provider's
 tolerance rather than by a contract. The `COOLDOWN_S` pause in the eval notebook and
 the 50-result ceiling in `app/server.py` exist for that reason. Removing them shifts
@@ -158,9 +158,9 @@ only the second is something to build a customer deployment on. Neither carries 
 data-processing agreement, so neither answers the constraint in
 [`../DATA_CLASSIFICATION.md`](../DATA_CLASSIFICATION.md#third-party-disclosure).
 
-The three API providers ask callers to identify themselves. `T2URL_CONTACT` is how
+The three API providers ask callers to identify themselves. `URLVESTIGIA_CONTACT` is how
 that is supplied, and it should be a team or service address: it makes queries
-attributable at the receiving end even though they stay unattributable in T2URL's
+attributable at the receiving end even though they stay unattributable in URLvestigia's
 own tables.
 
 Users see the URLs, not the mechanism. The Serve layer records and displays which

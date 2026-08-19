@@ -1,4 +1,4 @@
-# T2URL — build → test → deploy. One Git-driven pipeline.
+# URLvestigia — build → test → deploy. One Git-driven pipeline.
 #
 # GitLab does not look here by default. Point it at this file once:
 #   Settings → CI/CD → General pipelines → CI/CD configuration file
@@ -26,7 +26,7 @@ default:
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   # Never let CI write to a checked-in database.
-  T2URL_DB: "$CI_PROJECT_DIR/.tmp/ci.db"
+  URLVESTIGIA_DB: "$CI_PROJECT_DIR/.tmp/ci.db"
 
 cache:
   key:
@@ -47,7 +47,7 @@ build:
     - pip install -r app/requirements.txt -r tests/requirements.txt
     # Import each layer the way the runtime does. Catches a broken sys.path
     # before the test stage buries it in a fixture error.
-    - python -c "import sys; sys.path[:0] = ['retrieval', 'data', 'pipelines/jobs']; import t2url, db, url_enrichment; print('layers import OK')"
+    - python -c "import sys; sys.path[:0] = ['retrieval', 'data', 'pipelines/jobs']; import urlvestigia, db, url_enrichment; print('layers import OK')"
     - python -c "import app.server; print('serve layer imports OK')"
   artifacts:
     paths:
@@ -129,4 +129,4 @@ deploy:app:
     - .cicd/deploy.sh app --execute
   environment:
     name: cdp/$CDP_ENV
-    url: https://$CDP_ENV-ai.cloudera.site/t2url
+    url: https://$CDP_ENV-ai.cloudera.site/urlvestigia

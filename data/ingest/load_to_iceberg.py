@@ -1,8 +1,8 @@
 """Ingest — load the SQLite dev store into the raw Iceberg tables.
 
-The bridge between T2URL's two storage tiers. Reads `data/t2url.db` (whatever
-`app/server.py` has been writing) and appends it to `t2url.raw_searches` and
-`t2url.raw_search_urls`, created by `data/iceberg/ddl.sql`.
+The bridge between URLvestigia's two storage tiers. Reads `data/urlvestigia.db` (whatever
+`app/server.py` has been writing) and appends it to `urlvestigia.raw_searches` and
+`urlvestigia.raw_search_urls`, created by `data/iceberg/ddl.sql`.
 
 Dry-run needs nothing but the standard library, so it works on a laptop with no
 CDP environment:
@@ -21,7 +21,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DATA_DIR = HERE.parent
-DEFAULT_DB = DATA_DIR / "t2url.db"
+DEFAULT_DB = DATA_DIR / "urlvestigia.db"
 
 # Column order here must match the Iceberg DDL. Kept explicit rather than
 # SELECT * so a schema change fails loudly instead of silently misaligning.
@@ -74,7 +74,7 @@ def print_plan(searches, urls, args):
 
     # Printed output stays ASCII: this runs on a Windows console where the
     # default cp1252 codec raises on characters like U+2192.
-    print(f"T2URL ingest -- DRY RUN (no writes)\n{'=' * 52}")
+    print(f"URLvestigia ingest -- DRY RUN (no writes)\n{'=' * 52}")
     print(f"source     {args.db}")
     print(f"target     {target}")
     print(f"watermark  {args.since or '(none - full load)'}")
@@ -118,7 +118,7 @@ def load_to_iceberg(searches, urls, args):
 
     spark = (
         SparkSession.builder
-        .appName("t2url-ingest")
+        .appName("urlvestigia-ingest")
         .config("spark.sql.extensions",
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
         .getOrCreate()
@@ -133,7 +133,7 @@ def load_to_iceberg(searches, urls, args):
         df.writeTo(f"{prefix}.{table}").append()
         print(f"  appended {len(rows):>6} rows -> {prefix}.{table}")
 
-    print(f"T2URL ingest -> {prefix}")
+    print(f"URLvestigia ingest -> {prefix}")
     write(searches, SEARCH_COLUMNS, "raw_searches")
     write(urls, URL_COLUMNS, "raw_search_urls")
     print("Done. Run pipelines/jobs/url_enrichment.py to refresh curated_urls.")
@@ -146,8 +146,8 @@ def main(argv=None):
                         help=f"SQLite dev store (default: {DEFAULT_DB})")
     parser.add_argument("--catalog", default="spark_catalog",
                         help="Iceberg catalog name (default: spark_catalog)")
-    parser.add_argument("--database", default="t2url",
-                        help="Target database (default: t2url)")
+    parser.add_argument("--database", default="urlvestigia",
+                        help="Target database (default: urlvestigia)")
     parser.add_argument("--since", default="",
                         help="Only load searches with created_at greater than this "
                              "ISO-8601 UTC timestamp. Omit for a full load.")

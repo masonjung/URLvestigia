@@ -1,4 +1,4 @@
-# Design system — the URLoom UI
+# Design system — the URLvestigia UI
 
 The Serve layer's design spec. Every token below is a CSS custom property declared in
 the `:root` block of [`app/templates/index.html`](../../app/templates/index.html),
@@ -13,7 +13,7 @@ The contrast is the design: input is warm and inviting, output is a machine reco
 
 ```
 ┌─────────────────────────────────────────┐
-│  ▣ URLoom                    [chips]    │   app shell
+│  ▣ URLvestigia               [chips]    │   app shell
 │  ┌───────────────────────────────────┐  │   light, orange accent
 │  │  New search                       │  │
 │  │  [ textarea                     ] │  │

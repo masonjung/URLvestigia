@@ -8,7 +8,7 @@ serves a request.
 
 | Path | What it is |
 |---|---|
-| `jobs/url_enrichment.py` | Normalises, deduplicates, and enriches raw URLs into `t2url.curated_urls` |
+| `jobs/url_enrichment.py` | Normalises, deduplicates, and enriches raw URLs into `urlvestigia.curated_urls` |
 | `cde/url_enrichment.job.yaml` | Cloudera Data Engineering job definition — schedule, sizing, Spark conf |
 
 ## The job
@@ -70,6 +70,6 @@ is the full job definition — resource, schedule, sizing, Iceberg Spark conf.
 `.cicd/deploy.sh` uploads the job file and re-imports the definition on every merge
 to `main`, so the scheduled job always matches the committed code.
 
-Airflow is available in CDE for multi-step DAGs. T2URL has one job, so a cron
+Airflow is available in CDE for multi-step DAGs. URLvestigia has one job, so a cron
 schedule is the honest choice — reach for a DAG when ingest and enrichment need
 real ordering guarantees between them.

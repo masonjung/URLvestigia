@@ -1,4 +1,4 @@
-# T2URL — one command to ship.
+# URLvestigia — one command to ship.
 #
 #   make help      list every target
 #   make dev       run the Serve layer
@@ -15,7 +15,7 @@ VENV_PY := $(wildcard .venv/Scripts/python.exe) $(wildcard .venv/bin/python)
 PYTHON  ?= $(if $(VENV_PY),$(firstword $(VENV_PY)),python3)
 
 CATALOG    ?= spark_catalog
-DATABASE   ?= t2url
+DATABASE   ?= urlvestigia
 PORT       ?= 8000
 BACKUP_DIR ?= backups
 
@@ -24,7 +24,7 @@ BACKUP_DIR ?= backups
 
 ## help: list every target
 help:
-	@echo "T2URL — Cloudera Forge accelerator"
+	@echo "URLvestigia — Cloudera Forge accelerator"
 	@echo ""
 	@echo "  Develop"
 	@echo "    make install     install runtime + test dependencies"
@@ -112,4 +112,4 @@ endif
 clean:
 	@find . -path ./.venv -prune -o -type d -name __pycache__ -print0 2>/dev/null | xargs -0 rm -rf
 	@rm -rf .pytest_cache report.xml .tmp
-	@echo "cleaned (data/t2url.db left alone — delete it by hand if you mean to)"
+	@echo "cleaned (data/urlvestigia.db left alone — delete it by hand if you mean to)"

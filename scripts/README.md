@@ -17,7 +17,7 @@ make new VERTICAL=healthcare USECASE=readmission-risk
 
 Creates `../cloudera-forge-healthcare-readmission-risk/` as a sibling directory:
 copies the template, rewrites the accelerator name through the docs and Makefile,
-clears T2URL's worked example out of the layer directories while keeping their
+clears URLvestigia's worked example out of the layer directories while keeping their
 `README.md` guidance, and initialises a fresh git repo with one commit.
 
 It refuses to overwrite an existing directory. Pass `--dry-run` to see the plan

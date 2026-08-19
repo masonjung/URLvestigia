@@ -1,4 +1,4 @@
-# T2URL — architecture
+# URLvestigia — architecture
 
 Natural-language text in, a governed table of URLs out. One capability, wired across
 all five layers of the reference stack.
@@ -12,7 +12,7 @@ all five layers of the reference stack.
     cdp use      └────────────────┬────────────────────────────┘
     cases"                        │
                  ┌────────────────▼────────────────────────────┐     one provider
-                 │  AI         retrieval/t2url.py              │     per search
+                 │  AI         retrieval/urlvestigia.py              │     per search
                  │             text_to_urls()                  │ ──► ddgs ─► DuckDuckGo
                  │             retrieval/providers.py          │     │       Yahoo
                  │             one corpus per search           │     │       Startpage
@@ -25,15 +25,15 @@ all five layers of the reference stack.
                  │             data/ingest/      (→ Iceberg)   │
                  └────────────────┬────────────────────────────┘
                  ┌────────────────▼────────────────────────────┐
-                 │  LAKEHOUSE  t2url.raw_searches              │
-                 │             t2url.raw_search_urls           │
+                 │  LAKEHOUSE  urlvestigia.raw_searches              │
+                 │             urlvestigia.raw_search_urls           │
                  └────────────────┬────────────────────────────┘
                  ┌────────────────▼────────────────────────────┐
                  │  PROCESS    pipelines/jobs/url_enrichment   │
                  │             normalise · dedupe · enrich     │
                  └────────────────┬────────────────────────────┘
                                   ▼
-                          t2url.curated_urls
+                          urlvestigia.curated_urls
 
          ══════════ governed end to end by SDX ══════════
          Ranger policies · Atlas lineage · model card
@@ -51,7 +51,7 @@ all five layers of the reference stack.
 | **Governance** | `governance/` | Ranger policies, model card, classification | SDX |
 
 **On the AI layer's directory name.** The Forge standard calls this layer `ai/`, and
-T2URL deliberately does not. There is no model here and no inference: the layer is
+URLvestigia deliberately does not. There is no model here and no inference: the layer is
 keyword retrieval — a dispatch table, four HTTP clients, and an XML parser, on one
 dependency. A directory called `ai/` would claim a capability the code does not have,
 which is the same failure the support matrix in `retrieval/providers.py` exists to
@@ -65,7 +65,7 @@ A search is synchronous and touches three layers:
 
 1. **`POST /search`** — `app/server.py` whitelists every option against `OPTIONS`,
    clamps `max_results` to 1–50, and joins the checked engines into a fallback chain.
-2. **Retrieval** — `t2url.text_to_urls()` dispatches to the selected provider,
+2. **Retrieval** — `urlvestigia.text_to_urls()` dispatches to the selected provider,
    dropping any option that provider does not apply. `ddgs` queries web engines in
    order until it has enough results; the others call one API. Returns URLs
    deduplicated, in rank order.
@@ -172,7 +172,7 @@ remembered.
 ## Where the layering is tested
 
 The Serve layer holds no SQL and no retrieval logic; `data/db.py` holds every
-statement; `retrieval/t2url.py` has no database and no HTTP handling. The check on that
+statement; `retrieval/urlvestigia.py` has no database and no HTTP handling. The check on that
 claim is concrete: swapping the front-end for React should require no change in
 `retrieval/`, `data/`, `pipelines/`, or `governance/`.
 
@@ -187,14 +187,14 @@ claim is concrete: swapping the front-end for React should require no change in
   tomorrow returns different URLs. Every search persists its full option set and
   timestamp, so a result set is *explainable* even when it is not repeatable.
 - **Absence is not evidence.** Results are what a public engine ranked in the top N.
-  A missing URL does not mean the page does not exist. Never use T2URL output to
+  A missing URL does not mean the page does not exist. Never use URLvestigia output to
   conclude a document does not exist.
 - **SQLite serialises writes.** Fine for a demo, wrong for concurrent users. The
   Iceberg tier is the answer, and the ingest bridge is where that transition happens.
 
 ## Scale
 
-T2URL's volume is small — a search is a form post, not a stream. The sizing across
+URLvestigia's volume is small — a search is a form post, not a stream. The sizing across
 `infra/` and `pipelines/cde/` reflects that deliberately: CDE scales to zero between
 runs, executors are modest, enrichment is daily. **Raise these from measured spill,
 not from optimism.** The architecture that would change first if volume grew is

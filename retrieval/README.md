@@ -11,7 +11,7 @@ the note in [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#layer-by-layer).
 
 | Path | What it is |
 |---|---|
-| `t2url.py` | The retrieval façade — dispatch, dedupe, and the `ddgs` path |
+| `urlvestigia.py` | The retrieval façade — dispatch, dedupe, and the `ddgs` path |
 | `providers.py` | The support matrix, the one HTTP seam, and the Wikipedia / OpenAlex / arXiv providers |
 | `notebooks/eval.ipynb` | Coverage / overlap evaluation, run before changing defaults |
 | `requirements.txt` | One dependency: `ddgs`. No web framework, no database driver, no HTTP library. |
@@ -19,7 +19,7 @@ the note in [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#layer-by-layer).
 ## The capability
 
 ```python
-from t2url import text_to_urls
+from urlvestigia import text_to_urls
 
 urls = text_to_urls(
     "best python web scraping libraries",
@@ -71,21 +71,21 @@ that mapping is the only thing that makes `region` meaningful for an encyclopedi
 `ko.wikipedia.org` is a different corpus, not a Korean ranking of the English one.
 The direct API also does not depend on scraping tolerance.
 
-### `T2URL_CONTACT`
+### `URLVESTIGIA_CONTACT`
 
 Wikipedia, OpenAlex, and arXiv ask callers to identify themselves — Wikipedia via a
 descriptive `User-Agent`, OpenAlex via a `mailto` that admits you to its faster
-polite pool. Set `T2URL_CONTACT` to a **team or service address**:
+polite pool. Set `URLVESTIGIA_CONTACT` to a **team or service address**:
 
 ```bash
-export T2URL_CONTACT="data-platform@example.com"
+export URLVESTIGIA_CONTACT="data-platform@example.com"
 ```
 
 Not a key, not billed, and not required — unset degrades to the anonymous rate-limit
 pool rather than failing, so a fresh clone runs with nothing configured. Set it
 before running anything at volume, or throttling will look like a broken provider.
 It is an outbound identifier, so it is a disclosure consideration: see
-[`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md#the-t2url_contact-identifier).
+[`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md#the-urlvestigia_contact-identifier).
 
 ## Retrieval hyperparameters
 

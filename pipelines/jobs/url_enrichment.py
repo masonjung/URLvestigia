@@ -1,7 +1,7 @@
 """Process layer — normalise, deduplicate, and enrich raw search URLs.
 
-Reads `t2url.raw_search_urls` + `t2url.raw_searches`, and MERGEs one row per
-distinct URL into `t2url.curated_urls`. This is the lakehouse form of what
+Reads `urlvestigia.raw_search_urls` + `urlvestigia.raw_searches`, and MERGEs one row per
+distinct URL into `urlvestigia.curated_urls`. This is the lakehouse form of what
 `db.dedupe_urls()` does locally: keep one record per URL, remember the earliest
 sighting, drop the rest.
 
@@ -151,7 +151,7 @@ def run(args):
     prefix = f"{args.catalog}.{args.database}" if args.catalog else args.database
     spark = (
         SparkSession.builder
-        .appName("t2url-url-enrichment")
+        .appName("urlvestigia-url-enrichment")
         .config("spark.sql.extensions",
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
         .getOrCreate()
@@ -197,7 +197,7 @@ def print_plan(args):
     prefix = f"{args.catalog}.{args.database}" if args.catalog else args.database
     # Printed output stays ASCII: this runs on a Windows console where the
     # default cp1252 codec raises on characters like U+2192.
-    print(f"T2URL url_enrichment -- DRY RUN (no writes)\n{'=' * 52}")
+    print(f"URLvestigia url_enrichment -- DRY RUN (no writes)\n{'=' * 52}")
     print(f"read   {prefix}.raw_search_urls  (joined to raw_searches on search_id)")
     print(f"write  {prefix}.curated_urls     (MERGE on url)")
     print(f"since  {args.since or '(none - full rebuild)'}\n")
@@ -218,8 +218,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--catalog", default="spark_catalog",
                         help="Iceberg catalog name (default: spark_catalog)")
-    parser.add_argument("--database", default="t2url",
-                        help="Target database (default: t2url)")
+    parser.add_argument("--database", default="urlvestigia",
+                        help="Target database (default: urlvestigia)")
     parser.add_argument("--since", default="",
                         help="Only process rows with created_at greater than this "
                              "ISO-8601 UTC timestamp. Omit for a full rebuild.")

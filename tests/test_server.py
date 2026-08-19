@@ -5,7 +5,7 @@ is actually responsible for: input validation, POST-redirect-GET, and rendering.
 """
 
 import pytest
-import t2url
+import urlvestigia
 from app import server
 
 
@@ -13,7 +13,7 @@ def test_home_renders(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "URLoom" in response.text
+    assert "URLvestigia" in response.text
     assert "saved_searches" in response.text
 
 
@@ -125,7 +125,7 @@ def test_every_offered_provider_is_implemented():
     another name, and `_pick`'s whitelist would not catch it because the name *is*
     whitelisted. The two are equal today; the subset check is what holds if a corpus
     is ever withheld from the UI again."""
-    assert set(server.OPTIONS["provider"]) <= set(t2url.REGISTRY)
+    assert set(server.OPTIONS["provider"]) <= set(urlvestigia.REGISTRY)
 
 
 def test_unknown_provider_falls_back_to_the_default(client):
@@ -193,7 +193,7 @@ def test_retrieval_error_surfaces_as_a_message(client, monkeypatch):
     def boom(text, **kwargs):
         raise RuntimeError("rate limited")
 
-    monkeypatch.setattr(server.t2url, "text_to_urls", boom)
+    monkeypatch.setattr(server.urlvestigia, "text_to_urls", boom)
     response = client.post("/search", data={"text": "a"}, follow_redirects=False)
 
     assert response.status_code == 303
@@ -211,7 +211,7 @@ def test_a_failure_names_the_provider_and_engines(client, monkeypatch):
     def boom(text, **kwargs):
         raise RuntimeError("rate limited")
 
-    monkeypatch.setattr(server.t2url, "text_to_urls", boom)
+    monkeypatch.setattr(server.urlvestigia, "text_to_urls", boom)
     response = client.post("/search", data={
         "text": "a", "provider": "ddgs", "backend": ["duckduckgo", "yahoo"],
     }, follow_redirects=False)
@@ -228,7 +228,7 @@ def test_a_failure_names_a_non_web_provider_without_engines(client, monkeypatch)
     def boom(text, **kwargs):
         raise RuntimeError("timed out")
 
-    monkeypatch.setattr(server.t2url, "text_to_urls", boom)
+    monkeypatch.setattr(server.urlvestigia, "text_to_urls", boom)
     response = client.post("/search", data={"text": "a", "provider": "arxiv"},
                            follow_redirects=False)
 
@@ -243,7 +243,7 @@ def test_no_results_is_reported_not_silently_saved(client, monkeypatch):
     """An empty result set must not be persisted as a successful search."""
     from app import server
 
-    monkeypatch.setattr(server.t2url, "text_to_urls", lambda text, **kw: [])
+    monkeypatch.setattr(server.urlvestigia, "text_to_urls", lambda text, **kw: [])
     response = client.post("/search", data={"text": "a"}, follow_redirects=False)
 
     assert "No results found" in client.get(response.headers["location"]).text
@@ -407,7 +407,7 @@ def test_store_writes_a_snapshot_and_reports_its_contents(client):
     client.post("/search", data={"text": "a"})
     response = client.post("/store", follow_redirects=False)
 
-    written = list((server.backup.DEFAULT_DIR).glob("t2url-*.db"))
+    written = list((server.backup.DEFAULT_DIR).glob("urlvestigia-*.db"))
     assert len(written) == 1
     body = client.get(response.headers["location"]).text
     assert "Stored" in body
@@ -428,7 +428,7 @@ def test_download_returns_the_database_as_an_attachment(client):
     assert response.status_code == 200
     disposition = response.headers["content-disposition"]
     assert "attachment" in disposition
-    assert "t2url-" in disposition and ".db" in disposition
+    assert "urlvestigia-" in disposition and ".db" in disposition
     # A real SQLite file, not an error page rendered with a 200.
     assert response.content.startswith(b"SQLite format 3\x00")
 
@@ -453,12 +453,12 @@ def test_download_carries_the_rows(client, temp_db):
 def test_download_leaves_no_file_in_the_backups_directory(client):
     """Store owns backups/. Downloading must not add a file there on every click —
     the snapshot it sends is temporary and deleted once the response is out."""
-    before = set(server.backup.DEFAULT_DIR.glob("t2url-*.db"))
+    before = set(server.backup.DEFAULT_DIR.glob("urlvestigia-*.db"))
     client.post("/search", data={"text": "a"})
 
     client.get("/download")
 
-    assert set(server.backup.DEFAULT_DIR.glob("t2url-*.db")) == before
+    assert set(server.backup.DEFAULT_DIR.glob("urlvestigia-*.db")) == before
 
 
 def test_download_before_any_search_explains_itself(client, temp_db):

@@ -35,7 +35,7 @@ Closes #
 
 **Changed a retrieval default in `retrieval/`?**
 - [ ] `retrieval/notebooks/eval.ipynb` run, results dated in
-      `governance/model_cards/t2url-retrieval.md`
+      `governance/model_cards/urlvestigia-retrieval.md`
 - [ ] Defaults table in `retrieval/README.md` updated
 
 **Changed a schema in `data/`?**

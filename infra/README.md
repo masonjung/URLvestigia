@@ -50,9 +50,9 @@ created here — it is a per-cloud-account prerequisite, created once with
 CDP Environment  (identity, networking, SDX)
   └── Data Lake                    → governance, Ranger policies, Atlas lineage
   └── Data Engineering service     → runs data/ingest/ and pipelines/jobs/
-        └── virtual cluster "t2url-vc"
+        └── virtual cluster "urlvestigia-vc"
   └── AI Workbench                 → hosts retrieval/notebooks/ and app/ as an Application
-  └── Iceberg database "t2url"     → from data/iceberg/ddl.sql
+  └── Iceberg database "urlvestigia"     → from data/iceberg/ddl.sql
 ```
 
 Environment creation takes roughly 60 minutes. That is CDP, not the tooling.

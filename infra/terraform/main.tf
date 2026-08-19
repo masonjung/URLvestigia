@@ -1,4 +1,4 @@
-# T2URL — CDP stack as code.
+# URLvestigia — CDP stack as code.
 #
 # The declarative equivalent of infra/cdp/provision.sh. Use whichever fits the
 # customer: the shell script is easier to read in a workshop, Terraform is what
@@ -23,7 +23,7 @@ terraform {
   # State must not live on a laptop. Uncomment and point at the team's bucket
   # before anyone else runs this.
   # backend "s3" {
-  #   bucket = "t2url-terraform-state"
+  #   bucket = "urlvestigia-terraform-state"
   #   key    = "cdp/terraform.tfstate"
   #   region = "us-west-2"
   # }
@@ -42,7 +42,7 @@ locals {
 # --- Foundation ------------------------------------------------------------
 # Identity, storage, and SDX. Everything else attaches to this.
 
-resource "cdp_environments_aws_environment" "t2url" {
+resource "cdp_environments_aws_environment" "urlvestigia" {
   environment_name = var.env_name
   credential_name  = var.credential_name
   region           = var.region
@@ -58,9 +58,9 @@ resource "cdp_environments_aws_environment" "t2url" {
   tags = var.tags
 }
 
-resource "cdp_datalake_aws_datalake" "t2url" {
+resource "cdp_datalake_aws_datalake" "urlvestigia" {
   datalake_name    = local.datalake_name
-  environment_name = cdp_environments_aws_environment.t2url.environment_name
+  environment_name = cdp_environments_aws_environment.urlvestigia.environment_name
   scale            = var.datalake_scale
 
   cloud_provider_configuration = {
@@ -73,9 +73,9 @@ resource "cdp_datalake_aws_datalake" "t2url" {
 # --- Process layer ---------------------------------------------------------
 # Runs data/ingest/load_to_iceberg.py and pipelines/jobs/url_enrichment.py.
 
-resource "cdp_de_service" "t2url" {
+resource "cdp_de_service" "urlvestigia" {
   name        = local.cde_service
-  environment = cdp_environments_aws_environment.t2url.environment_name
+  environment = cdp_environments_aws_environment.urlvestigia.environment_name
 
   instance_type     = var.cde_instance_type
   minimum_instances = 0 # an idle cluster should cost nothing
@@ -87,12 +87,12 @@ resource "cdp_de_service" "t2url" {
 
   # CDE cannot come up until SDX is ready, and the dependency is not implied by
   # any attribute reference above.
-  depends_on = [cdp_datalake_aws_datalake.t2url]
+  depends_on = [cdp_datalake_aws_datalake.urlvestigia]
 }
 
-resource "cdp_de_virtual_cluster" "t2url" {
-  name       = "t2url-vc"
-  cluster_id = cdp_de_service.t2url.cluster_id
+resource "cdp_de_virtual_cluster" "urlvestigia" {
+  name       = "urlvestigia-vc"
+  cluster_id = cdp_de_service.urlvestigia.cluster_id
 
   cpu_requests    = "4"
   memory_requests = "16Gi"
@@ -102,9 +102,9 @@ resource "cdp_de_virtual_cluster" "t2url" {
 # --- AI + Serve layers -----------------------------------------------------
 # Hosts retrieval/notebooks/ as sessions and app/ as a long-running Application.
 
-resource "cdp_ml_workspace" "t2url" {
+resource "cdp_ml_workspace" "urlvestigia" {
   workspace_name   = local.ai_workbench
-  environment_name = cdp_environments_aws_environment.t2url.environment_name
+  environment_name = cdp_environments_aws_environment.urlvestigia.environment_name
 
   instance_type = var.ai_instance_type
   min_instances = 1
@@ -115,7 +115,7 @@ resource "cdp_ml_workspace" "t2url" {
 
   tags = var.tags
 
-  depends_on = [cdp_datalake_aws_datalake.t2url]
+  depends_on = [cdp_datalake_aws_datalake.urlvestigia]
 }
 
 # --- Outputs ---------------------------------------------------------------
@@ -124,17 +124,17 @@ resource "cdp_ml_workspace" "t2url" {
 
 output "environment_crn" {
   description = "CRN of the CDP environment."
-  value       = cdp_environments_aws_environment.t2url.crn
+  value       = cdp_environments_aws_environment.urlvestigia.crn
 }
 
 output "cde_virtual_cluster_id" {
   description = "Target for `cde job import` in .cicd/deploy.sh."
-  value       = cdp_de_virtual_cluster.t2url.vc_id
+  value       = cdp_de_virtual_cluster.urlvestigia.vc_id
 }
 
 output "ai_workbench_url" {
   description = "Where the Serve layer is published."
-  value       = cdp_ml_workspace.t2url.workspace_url
+  value       = cdp_ml_workspace.urlvestigia.workspace_url
 }
 
 output "iceberg_warehouse" {

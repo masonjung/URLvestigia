@@ -1,4 +1,4 @@
-# Walkthrough — T2URL across every layer
+# Walkthrough — URLvestigia across every layer
 
 Follow one search from a form post to a governed row in `curated_urls`. Every command
 here runs on a laptop; nothing needs a CDP environment until the last section.
@@ -29,7 +29,7 @@ python scripts/example.py
 
 ```python
 # scripts/example.py, in full
-from t2url import text_to_urls
+from urlvestigia import text_to_urls
 
 for url in text_to_urls("Cloudera CDP supports use cases", max_results=16):
     print(url)
@@ -59,7 +59,7 @@ Type a question, pick engines, hit **Search**. What happens:
    [`app/server.py`](../app/server.py); `max_results` is clamped to 1–50.
 2. Checked engines are filtered, deduplicated, and joined into a fallback chain.
    Order is preserved because order is meaningful.
-3. `t2url.text_to_urls()` runs.
+3. `urlvestigia.text_to_urls()` runs.
 4. `db.save_search()` persists the query, its full option set, and the URLs.
 5. **303 redirect** back to `/` with a flash message — reloading never re-runs the
    search.
@@ -79,8 +79,8 @@ All three are asserted in [`tests/test_server.py`](../tests/test_server.py).
 The searches you just ran are in SQLite:
 
 ```bash
-sqlite3 data/t2url.db "SELECT id, query, backend, region FROM searches ORDER BY id DESC LIMIT 5;"
-sqlite3 data/t2url.db "SELECT position, url FROM search_urls WHERE search_id = 1 ORDER BY position;"
+sqlite3 data/urlvestigia.db "SELECT id, query, backend, region FROM searches ORDER BY id DESC LIMIT 5;"
+sqlite3 data/urlvestigia.db "SELECT position, url FROM search_urls WHERE search_id = 1 ORDER BY position;"
 ```
 
 Two tables, parent and child, cascade on delete. Every statement the application runs
@@ -99,16 +99,16 @@ make ingest
 ```
 
 ```
-T2URL ingest — DRY RUN (no writes)
+URLvestigia ingest — DRY RUN (no writes)
 ====================================================
-source     data/t2url.db
-target     spark_catalog.t2url
+source     data/urlvestigia.db
+target     spark_catalog.urlvestigia
 watermark  (none — full load)
 
 table                            rows
 --------------------------------------
-spark_catalog.t2url.raw_searches    3
-spark_catalog.t2url.raw_search_urls 27
+spark_catalog.urlvestigia.raw_searches    3
+spark_catalog.urlvestigia.raw_search_urls 27
 ```
 
 The dry run needs nothing but the standard library, which is the point — you can read
@@ -167,12 +167,12 @@ stays narrow: analysts read the URL tables outright and see `query` only as a ha
 engineers see everything; the app's service account can append to raw and nothing
 else. Narrow, and defensible in a review.
 
-Then read [`governance/model_cards/t2url-retrieval.md`](../governance/model_cards/t2url-retrieval.md) —
-in particular **what it must not be used for**. T2URL cannot tell you a document does
+Then read [`governance/model_cards/urlvestigia-retrieval.md`](../governance/model_cards/urlvestigia-retrieval.md) —
+in particular **what it must not be used for**. URLvestigia cannot tell you a document does
 not exist. Absence from the results means an engine did not rank it in the top N.
 
 Note what the model card does *not* have: a dated evaluation. That is a real gap, and
-it is why T2URL sits at ⚠️ on the Harden gate.
+it is why URLvestigia sits at ⚠️ on the Harden gate.
 
 ---
 
@@ -210,7 +210,7 @@ make new VERTICAL=healthcare USECASE=readmission-risk
 ```
 
 Creates `../cloudera-forge-healthcare-readmission-risk/`: the layout and every
-directory's `README.md` guidance, with T2URL's own code cleared out, re-pointed to
+directory's `README.md` guidance, with URLvestigia's own code cleared out, re-pointed to
 your name, and a fresh git history.
 
 Then work directory by directory, using each `README.md` as the guide and

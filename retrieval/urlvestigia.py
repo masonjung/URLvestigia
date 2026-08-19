@@ -1,4 +1,4 @@
-"""t2url — natural-language text in, a list of URLs out, via free web search.
+"""urlvestigia — natural-language text in, a list of URLs out, via free web search.
 
 Free to run: no API keys, no accounts. Web searches go to the engines' public pages
 through the ddgs metasearch library; Wikipedia, OpenAlex, and arXiv are reached

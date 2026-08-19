@@ -1,1 +1,1 @@
-"""T2URL Serve layer — the FastAPI + Jinja2 reference dashboard."""
+"""URLvestigia Serve layer — the FastAPI + Jinja2 reference dashboard."""

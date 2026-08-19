@@ -46,11 +46,11 @@ def staged_aliases():
 class TestCuratedUrlsAlignment:
     def test_staged_columns_match_curated_urls_exactly(self):
         """Same names, same order — this is what `INSERT *` relies on."""
-        assert staged_aliases() == ddl_columns("t2url.curated_urls")
+        assert staged_aliases() == ddl_columns("urlvestigia.curated_urls")
 
     def test_providers_is_carried_all_the_way_through(self):
         assert "providers" in staged_aliases()
-        assert "providers" in ddl_columns("t2url.curated_urls")
+        assert "providers" in ddl_columns("urlvestigia.curated_urls")
 
     def test_every_aggregate_is_also_merged_on_conflict(self):
         """An aggregate in the INSERT but not the UPDATE freezes at its first
@@ -105,7 +105,7 @@ class TestCuratedUrlsAlignment:
 class TestRawTableAlignment:
     def test_enrichment_reads_columns_the_raw_table_declares(self):
         """The job selects `provider` off raw_search_urls; the DDL must have it."""
-        raw = ddl_columns("t2url.raw_search_urls")
+        raw = ddl_columns("urlvestigia.raw_search_urls")
 
         assert "provider" in raw
         assert "url" in raw and "position" in raw and "search_id" in raw

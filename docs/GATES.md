@@ -48,7 +48,7 @@ score it.
       score.
 - [ ] **Weighted total ≥ 4.0 / 5** to advance
 - [ ] Can the data leave the customer's environment? **Answer this now.** It has
-      killed accelerators at Harden that were fine on every other axis — T2URL has a
+      killed accelerators at Harden that were fine on every other axis — URLvestigia has a
       real constraint here (see
       [`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md#third-party-disclosure))
 - [ ] Owner assigned for Architect
@@ -135,7 +135,7 @@ had to ask you something, the gap is a documentation defect, not a training issu
 
 ---
 
-## Where T2URL stands
+## Where URLvestigia stands
 
 Honest status, not aspiration:
 

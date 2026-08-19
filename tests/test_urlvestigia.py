@@ -1,12 +1,12 @@
-"""AI layer — unit tests for `retrieval/t2url.py`.
+"""AI layer — unit tests for `retrieval/urlvestigia.py`.
 
-Every test stubs `DDGS`. These verify the contract T2URL guarantees about search
+Every test stubs `DDGS`. These verify the contract URLvestigia guarantees about search
 results, not whether a search engine is up.
 """
 
 import pytest
 
-import t2url
+import urlvestigia
 
 
 class FakeDDGS:
@@ -30,7 +30,7 @@ def patched(monkeypatch):
     """Install a FakeDDGS returning `results`, and hand back the recorded call."""
 
     def _install(results=None, raises=None):
-        monkeypatch.setattr(t2url, "DDGS", lambda: FakeDDGS(results, raises))
+        monkeypatch.setattr(urlvestigia, "DDGS", lambda: FakeDDGS(results, raises))
         FakeDDGS.last_call = None
         return FakeDDGS
 
@@ -39,7 +39,7 @@ def patched(monkeypatch):
 
 def test_extracts_urls_in_rank_order(patched, fake_results):
     patched(fake_results)
-    urls = t2url.text_to_urls("cloudera cdp")
+    urls = urlvestigia.text_to_urls("cloudera cdp")
 
     assert urls[0] == "https://www.cloudera.com/products/cdp.html?utm_source=search"
     assert urls[1] == "https://docs.cloudera.com/cdp/latest/index.html"
@@ -52,14 +52,14 @@ def test_accepts_legacy_url_key(patched, fake_results):
     results — the failure mode that is indistinguishable from "no matches".
     """
     patched(fake_results)
-    urls = t2url.text_to_urls("cloudera cdp")
+    urls = urlvestigia.text_to_urls("cloudera cdp")
 
     assert "https://blog.cloudera.com/iceberg-in-cdp/" in urls
 
 
 def test_deduplicates_exact_repeats(patched, fake_results):
     patched(fake_results)
-    urls = t2url.text_to_urls("cloudera cdp")
+    urls = urlvestigia.text_to_urls("cloudera cdp")
 
     assert len(urls) == len(set(urls))
     assert len(urls) == 4  # five results, one exact repeat
@@ -69,13 +69,13 @@ def test_empty_text_short_circuits(patched):
     """Blank input must not reach a search engine at all."""
     patched([{"href": "https://example.com"}])
 
-    assert t2url.text_to_urls("   ") == []
+    assert urlvestigia.text_to_urls("   ") == []
     assert FakeDDGS.last_call is None
 
 
 def test_query_is_stripped(patched):
     patched([])
-    t2url.text_to_urls("  cloudera cdp  ")
+    urlvestigia.text_to_urls("  cloudera cdp  ")
 
     assert FakeDDGS.last_call["query"] == "cloudera cdp"
 
@@ -84,12 +84,12 @@ def test_no_results_returns_empty_list(patched):
     """A throttled engine returns nothing. That must be an empty list, not None."""
     patched(None)
 
-    assert t2url.text_to_urls("anything") == []
+    assert urlvestigia.text_to_urls("anything") == []
 
 
 def test_options_are_forwarded(patched):
     patched([])
-    t2url.text_to_urls(
+    urlvestigia.text_to_urls(
         "iceberg",
         max_results=25,
         region="kr-kr",
@@ -109,7 +109,7 @@ def test_options_are_forwarded(patched):
 def test_empty_timelimit_normalises_to_none(patched):
     """The Serve layer sends "" for "any time"; ddgs expects None."""
     patched([])
-    t2url.text_to_urls("iceberg", timelimit="")
+    urlvestigia.text_to_urls("iceberg", timelimit="")
 
     assert FakeDDGS.last_call["timelimit"] is None
 
@@ -121,7 +121,7 @@ def test_results_without_a_url_are_skipped(patched):
         {"href": "https://example.com/real"},
     ])
 
-    assert t2url.text_to_urls("x") == ["https://example.com/real"]
+    assert urlvestigia.text_to_urls("x") == ["https://example.com/real"]
 
 
 def test_engine_failure_propagates(patched):
@@ -130,4 +130,4 @@ def test_engine_failure_propagates(patched):
     patched(raises=RuntimeError("rate limited"))
 
     with pytest.raises(RuntimeError, match="rate limited"):
-        t2url.text_to_urls("iceberg")
+        urlvestigia.text_to_urls("iceberg")

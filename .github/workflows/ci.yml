@@ -1,4 +1,4 @@
-# T2URL — CI on GitHub.
+# URLvestigia — CI on GitHub.
 #
 # This repo carries two pipeline definitions on purpose, and they are not
 # duplicates of each other:
@@ -43,7 +43,7 @@ jobs:
 
       - name: Every layer imports the way the runtime imports it
         run: |
-          python -c "import sys; sys.path[:0] = ['retrieval', 'data', 'pipelines/jobs']; import t2url, db, url_enrichment; print('layers import OK')"
+          python -c "import sys; sys.path[:0] = ['retrieval', 'data', 'pipelines/jobs']; import urlvestigia, db, url_enrichment; print('layers import OK')"
           python -c "import app.server; print('serve layer imports OK')"
 
       # No --live. CI must never fail because a search provider is rate-limiting;
@@ -74,7 +74,7 @@ jobs:
       # swallows every failure verifies nothing.
       - name: Ingest plan (dry run)
         run: |
-          export T2URL_DB="${RUNNER_TEMP}/ci.db"
+          export URLVESTIGIA_DB="${RUNNER_TEMP}/ci.db"
           python -c "
           import sys; sys.path.insert(0, 'data')
           import db
@@ -83,7 +83,7 @@ jobs:
                          region='wt-wt', safesearch='moderate', timelimit='',
                          backend='duckduckgo', max_results=10)
           "
-          python data/ingest/load_to_iceberg.py --db "${T2URL_DB}"
+          python data/ingest/load_to_iceberg.py --db "${URLVESTIGIA_DB}"
 
       - name: Enrichment plan (dry run, prints the MERGE)
         run: python pipelines/jobs/url_enrichment.py
