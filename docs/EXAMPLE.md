@@ -11,7 +11,7 @@ Budget about 20 minutes.
 
 ```bash
 pip install -r app/requirements.txt -r tests/requirements.txt
-make test          # 186 passing, 13 skipped (the live tier)
+make test          # 219 passing, 13 skipped (the live tier)
 ```
 
 If that is green, every layer imports and every contract holds. Start here — a

@@ -4,9 +4,8 @@
 persisted list of source links — with the query, provider, engines, region, and time
 window stored alongside, so a search becomes an artifact instead of an activity.
 
-Search the web, Wikipedia, or arXiv. Each exposes only the options it genuinely
-applies, and the record says which. (OpenAlex is implemented and callable from
-`retrieval/`, but is not currently offered on the form — see `app/server.py:OPTIONS`.)
+Search the web, Wikipedia, OpenAlex, or arXiv. Each exposes only the options it
+genuinely applies, and the record says which.
 
 Built to the Cloudera Forge standard accelerator layout: every layer of the reference
 stack — Ingest → Lakehouse → Process → AI → Serve — wired end to end and governed by
@@ -52,6 +51,7 @@ T2URL/
 ├── governance/   SDX policies · model card            → security · policy · lineage
 ├── tests/        data quality · retrieval eval        → the Harden gate
 ├── .cicd/        build → test → deploy                 → one Git-driven pipeline
+├── .github/      the same test tiers, in Actions       → what runs on every push here
 ├── .gitlab/      MR + issue templates                  → the process, where the work is
 ├── scripts/      new-accelerator.sh                    → scaffold the next one
 └── Makefile      make deploy                           → one command to ship
@@ -109,7 +109,7 @@ Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - **`data/` `pipelines/` `governance/` `infra/` `tests/`** — a thin but complete
   accelerator wired across every layer: Iceberg DDL, a Spark enrichment job with a CDE
   job spec, Ranger policies with a masking rule, CDP CLI *and* Terraform provisioning,
-  and 186 passing tests. Walkthrough: [`docs/EXAMPLE.md`](docs/EXAMPLE.md).
+  and a test suite across every layer. Walkthrough: [`docs/EXAMPLE.md`](docs/EXAMPLE.md).
 - **`scripts/new-accelerator.sh`** (via `make new`) — clones this template into a
   fresh, re-pointed, git-initialised accelerator repo.
 

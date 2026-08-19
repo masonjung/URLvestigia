@@ -47,7 +47,7 @@ build:
     - pip install -r app/requirements.txt -r tests/requirements.txt
     # Import each layer the way the runtime does. Catches a broken sys.path
     # before the test stage buries it in a fixture error.
-    - python -c "import sys; sys.path[:0] = ['ai', 'data', 'pipelines/jobs']; import t2url, db, url_enrichment; print('layers import OK')"
+    - python -c "import sys; sys.path[:0] = ['retrieval', 'data', 'pipelines/jobs']; import t2url, db, url_enrichment; print('layers import OK')"
     - python -c "import app.server; print('serve layer imports OK')"
   artifacts:
     paths:

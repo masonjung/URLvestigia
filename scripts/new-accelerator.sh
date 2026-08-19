@@ -52,7 +52,7 @@ DEST="${DEST_PARENT}/${NAME}"
 
 # Directories whose contents are this accelerator's worked example. The README.md
 # in each is the standard and is always kept; everything else is T2URL's own code.
-EXAMPLE_DIRS=(ai app data pipelines governance infra tests)
+EXAMPLE_DIRS=(retrieval app data pipelines governance infra tests)
 
 step() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }
 run()  { if $DRY_RUN; then echo "    $*"; else "$@"; fi; }

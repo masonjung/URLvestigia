@@ -6,6 +6,7 @@ is actually responsible for: input validation, POST-redirect-GET, and rendering.
 
 import pytest
 import t2url
+from app import server
 
 
 def test_home_renders(client):
@@ -106,30 +107,25 @@ def test_engine_order_and_uniqueness_are_preserved(client):
 
 # --- provider selection ----------------------------------------------------
 
-@pytest.mark.parametrize("provider", ["ddgs", "wikipedia", "arxiv"])
+@pytest.mark.parametrize("provider", server.OPTIONS["provider"])
 def test_every_ui_provider_is_accepted(client, provider):
-    """A typo here is a radio button that silently searches the web instead."""
+    """A typo here is a radio button that silently searches the web instead.
+
+    Parametrized from OPTIONS rather than a copy of it, so a provider added to the
+    form is covered the moment it is offered — this list had already drifted once.
+    """
     client.post("/search", data={"text": "a", "provider": provider})
 
     assert client.search_calls[0]["provider"] == provider
 
 
 def test_every_offered_provider_is_implemented():
-    """The UI list may be a subset of what retrieval/ implements — openalex is implemented
-    but withdrawn from the form — but it can never be a superset. Offering a provider
-    with no registry entry would silently search the web under another name, and
-    `_pick`'s whitelist would not catch it because the name *is* whitelisted."""
-    from app import server
-
+    """The form may offer a subset of what retrieval/ implements, but never a superset.
+    Offering a provider with no registry entry would silently search the web under
+    another name, and `_pick`'s whitelist would not catch it because the name *is*
+    whitelisted. The two are equal today; the subset check is what holds if a corpus
+    is ever withheld from the UI again."""
     assert set(server.OPTIONS["provider"]) <= set(t2url.REGISTRY)
-
-
-def test_a_withdrawn_provider_cannot_be_posted(client):
-    """openalex is gone from the form but still in the registry, so the whitelist is
-    the only thing stopping a hand-crafted POST from reaching it."""
-    client.post("/search", data={"text": "a", "provider": "openalex"})
-
-    assert client.search_calls[0]["provider"] == "ddgs"
 
 
 def test_unknown_provider_falls_back_to_the_default(client):
@@ -306,10 +302,11 @@ def test_provider_column_shows_a_readable_label(client):
     assert ">arXiv<" in client.get("/").text
 
 
-def test_a_withdrawn_provider_still_has_a_label(client, temp_db):
-    """Rows searched before openalex left the form must keep reading "OpenAlex".
-    PROVIDER_LABELS covers every provider ever searched, not just the ones offered,
-    so retiring one from the UI cannot relabel history with the bare id."""
+def test_a_retired_provider_would_still_have_a_label(client, temp_db):
+    """PROVIDER_LABELS covers every provider ever searched, not just the ones on
+    offer, so withdrawing one from the UI can never relabel history with the bare id.
+    Every provider is offered today, so this exercises the label path rather than a
+    live retirement — it is the guarantee that has to survive the next one."""
     temp_db.save_search("a", ["https://example.org/1"], provider="openalex")
 
     body = client.get("/").text
@@ -342,12 +339,17 @@ def test_provider_controls_are_hidden_by_generated_css(client):
     assert ".sentence:has(#pv-ddgs:checked)" not in body
 
 
-def test_a_withdrawn_provider_renders_no_control(client):
-    """No radio and no CSS rule for a provider that is not on offer."""
+def test_openalex_renders_a_pill_and_hides_what_it_cannot_apply(client):
+    """OpenAlex applies `timelimit` and nothing else, so the form must offer it and
+    hide the other three. The pill comes from _providers() and the rules from
+    p.unsupported — the same matrix — so this catches a provider added to OPTIONS
+    with no matching entry in SUPPORTS."""
     body = client.get("/").text
 
-    assert 'id="pv-openalex"' not in body
-    assert "#pv-openalex" not in body
+    assert 'id="pv-openalex"' in body
+    for option in ("region", "safesearch", "backend"):
+        assert f".sentence:has(#pv-openalex:checked) .opt-{option}" in body
+    assert ".sentence:has(#pv-openalex:checked) .opt-timelimit" not in body
 
 
 def test_query_text_is_escaped(client):

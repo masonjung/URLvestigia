@@ -25,11 +25,10 @@ import t2url
 
 ENGINES = ["duckduckgo", "yahoo", "startpage", "yandex"]
 
-# Every corpus the retrieval layer implements, which is a superset of what the UI offers —
-# openalex is still evaluated here after being withdrawn from the form, because the
-# provider is what these tests measure and it remains callable. These are an axis, not
-# links in the `backend` chain: a web-search miss must not fall through to arXiv and
-# answer with preprints.
+# Every corpus the retrieval layer implements. The form offers all four today, but this
+# list tracks the registry rather than the form, because the provider is what these tests
+# measure. These are an axis, not links in the `backend` chain: a web-search miss must not
+# fall through to arXiv and answer with preprints.
 PROVIDERS = ["ddgs", "wikipedia", "openalex", "arxiv"]
 
 # A search that takes longer than this is unusable behind a synchronous form

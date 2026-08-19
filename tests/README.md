@@ -29,7 +29,7 @@ pytest tests -q -k dedupe     # one behaviour
 Install with `pip install -r app/requirements.txt -r tests/requirements.txt`, or
 just `make install`.
 
-Current state: **186 passing, 13 skipped** (the live tier).
+Current state: **219 passing, 13 skipped** (the live tier).
 
 ## The two tiers
 
@@ -90,7 +90,8 @@ Stated plainly, because an unstated gap reads as a claim:
 
 ## Which Cloudera tool automates it
 
-`.cicd/pipeline.yml` runs `make test` on every merge request — the gate is enforced
-by CI, not by habit. For the platform tiers, data quality checks that need real
+`.cicd/pipeline.yml` runs `pytest tests -q` on every merge request, and
+`.github/workflows/ci.yml` runs it on every push — the gate is enforced by CI, not by
+habit. Neither passes `--live`. For the platform tiers, data quality checks that need real
 tables belong in a **Cloudera Data Engineering** job alongside the pipelines, so they
 run against the lakehouse on the same schedule as the data.

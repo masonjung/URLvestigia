@@ -145,7 +145,7 @@ Honest status, not aspiration:
 | Qualify | ✅ |
 | Architect | ✅ [`ARCHITECTURE.md`](ARCHITECTURE.md), [`BUSINESS_CASE.md`](BUSINESS_CASE.md) |
 | Build | ✅ every layer wired, `make dev` works |
-| **Harden** | ⚠️ **incomplete** — tests are green (186 passing), but the model card has **no dated eval run**, `raw_searches` has **no row-level retention**, and `ingress_cidrs` still defaults to `0.0.0.0/0` |
+| **Harden** | ⚠️ **incomplete** — tests are green, but the model card has **no dated eval run**, `raw_searches` has **no row-level retention**, and `ingress_cidrs` still defaults to `0.0.0.0/0` |
 | Publish | ⚠️ blocked on Harden |
 
 The three Harden gaps are tracked in

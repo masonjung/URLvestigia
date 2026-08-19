@@ -27,12 +27,12 @@ db.init_db()
 
 # Allowed values per search option; first entry is the default fallback.
 #
-# `provider` is the list the UI offers, which is a subset of what retrieval/ implements —
-# openalex is still a working provider in t2url.REGISTRY, it is simply not on the
-# form. Anything not listed here is coerced back to the default by _pick(), so a
-# provider withdrawn from the UI cannot be reached by posting it by hand either.
+# `provider` currently offers every corpus retrieval/ implements, but it stays a
+# whitelist rather than a mirror of t2url.REGISTRY — the two are allowed to
+# diverge. Anything not listed here is coerced back to the default by _pick(), so
+# a provider withheld from the UI cannot be reached by posting it by hand either.
 OPTIONS = {
-    "provider": ["ddgs", "wikipedia", "arxiv"],
+    "provider": ["ddgs", "wikipedia", "openalex", "arxiv"],
     "timelimit": ["", "d", "w", "m", "y"],
     "backend": ["duckduckgo", "yahoo", "startpage", "yandex"],
     "safesearch": ["moderate", "off", "on"],
