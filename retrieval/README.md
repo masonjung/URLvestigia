@@ -87,6 +87,47 @@ before running anything at volume, or throttling will look like a broken provide
 It is an outbound identifier, so it is a disclosure consideration: see
 [`governance/DATA_CLASSIFICATION.md`](../governance/DATA_CLASSIFICATION.md#the-urlvestigia_contact-identifier).
 
+### `URLVESTIGIA_DDGS_TIMEOUT`
+
+Seconds the web provider spends on one search, default **12** — matched to
+`URLVESTIGIA_HTTP_TIMEOUT` so there is one number to reason about, not two.
+
+This is not only a socket timeout. ddgs spends the same value as the window in which
+it collects from the engines it queried concurrently, and drops whatever has not
+arrived when it closes. The library's own default of 5s is generous at a desk and
+fatal on conference or hotel wifi, where every engine misses the window and the
+search returns nothing at all. Raise it on a slow or proxied network:
+
+```bash
+export URLVESTIGIA_DDGS_TIMEOUT=25
+```
+
+Resolved at import, so set it before the process starts. An unparseable or
+non-positive value falls back to the default rather than failing at import — a typo
+in a demo machine's environment should not take the app down.
+
+### Proxies
+
+The web provider honours `DDGS_PROXY` first, then the conventional `HTTPS_PROXY` /
+`HTTP_PROXY`. ddgs itself reads only the first, so without the fallback a corporate
+network that publishes the standard variables would have every engine fail with no
+indication that a proxy was ever involved.
+
+TLS interception is **not** worked around. `make doctor` names it when it sees it;
+nothing here disables certificate verification.
+
+## Checking a machine before you rely on it
+
+```bash
+make doctor
+```
+
+Probes every provider, and every web engine individually, reporting latency and a
+demo-readiness verdict. Worth running before any live demo: it is the difference
+between knowing DuckDuckGo is rate-limiting this IP and discovering it in front of
+an audience. A blocked engine is a measurement of the network, not a defect, so it
+does not fail the target.
+
 ## Retrieval hyperparameters
 
 These are the knobs the Serve layer exposes and the eval harness sweeps. Defaults
@@ -99,15 +140,20 @@ are what `text_to_urls` uses when the caller says nothing.
 | `region` | `"wt-wt"` | `wt-wt`, `us-en`, `uk-en`, `kr-kr`, `jp-jp`, `de-de`, `fr-fr` | Locale bias for `ddgs`; language edition for `wikipedia`. Ignored elsewhere. |
 | `safesearch` | `"moderate"` | `off`, `moderate`, `on` | Engine-side content filter. `ddgs` only. |
 | `timelimit` | `None` | `None`, `d`, `w`, `m`, `y` | Recency window. `None` = any time. Ignored by `wikipedia`. |
-| `backend` | `"duckduckgo"` | comma-delimited chain | Engine fallback order. `ddgs` only. |
+| `backend` | `"duckduckgo"` | comma-delimited list | Which engines to query, concurrently. `ddgs` only. |
 
 ## Two kinds of "more than one source"
 
-**Within `ddgs`, `backend` is a fallback chain.** It accepts a comma-delimited list —
-`"duckduckgo,yahoo,startpage,yandex"`. This is **resilience, not a merge**: ddgs tries
-engines in order and stops as soon as it has `max_results`, so one throttled engine
-does not fail the search. Order matters; the first engine supplies most results in
-the common case.
+**Within `ddgs`, `backend` selects engines queried concurrently.** It accepts a
+comma-delimited list — `"duckduckgo,yahoo,startpage,yandex"`. This is **resilience,
+not a merge**: one throttled engine does not fail the search.
+
+It is *not* a chain tried in order. ddgs 9.x submits engines to a thread pool and
+pools whatever comes back inside one `wait()`; selection order is a weak input to its
+ranker, not a priority. More engines is therefore not more results — see
+["Multi-engine is resilience"](../docs/ARCHITECTURE.md) for the mechanics and for why
+`_search_ddgs` inflates its request to make sure every selected engine is queried
+at all.
 
 Only four engines are exposed in the UI. ddgs also supports google, brave, and
 mojeek, but they are blocked or return empty too often to be a dependable default.

@@ -117,6 +117,42 @@ engines *asked*, not the engine that answered** — see the note under *Provider
 an axis*. Second, selecting more engines is not free extra coverage; measure it with
 `retrieval/notebooks/eval.ipynb` rather than assuming.
 
+**The worker formula meant half the selection was never queried.** Following the
+arithmetic above to its conclusion: `ceil(10 / 10) + 1 == 2`. At the UI default of
+`max_results=10`, checking all four engines queried **two** of them. The resilience
+the four checkboxes advertise was half delivered, and the shortfall was invisible —
+a search that quietly asked fewer engines looks exactly like one that asked them all.
+
+`_search_ddgs` now asks ddgs for `max(max_results, 30)`, which sizes the pool to four
+workers, and `text_to_urls` re-applies the caller's ceiling as it always has. The
+widened request cannot widen what a caller receives; it only widens what is asked.
+This reaches into a library internal, so **re-check it on a ddgs upgrade** — if the
+formula changes, the repo silently reverts to querying too few engines.
+
+**A blocked search and an empty one are not the same claim.** ddgs reports "every
+engine failed" as an empty result, which reached the user as a calm *No results
+found.* — a dead network wearing the face of a corpus with nothing in it. That is
+indefensible in a repo whose whole argument is that a search is a record.
+
+Three cases now separate, in descending order of evidence:
+
+- **An engine said why.** ddgs logs `Error in engine %s: %r` at INFO and then discards
+  the exception; `urlvestigia` listens for those records and raises `EngineError`
+  carrying every `(engine, reason)` pair, which the Serve layer renders by name.
+- **No engine answered in time.** Engines that miss the `wait()` land in `not_done`
+  and are dropped with no exception and no log — the slow-network failure, and the
+  one ddgs helps with least. The only evidence left is the clock: an empty search
+  that consumed the whole collection window ran out of time rather than came up
+  empty.
+- **A genuine miss** still returns `[]` and still reads as *No results found.*
+
+One gap stays open and is documented rather than papered over: an engine answering
+HTTP 200 with an empty body or a challenge page raises nothing and logs nothing, so
+it remains indistinguishable from a real miss. Rate limiting frequently looks exactly
+like that. `make doctor` is the answer to that gap — it probes each engine
+individually and treats an instant empty answer as a probable block, which is a
+heuristic it states as one.
+
 **Providers are an axis, not links in the chain.** The decision above is why
 Wikipedia, OpenAlex, and arXiv are a separate choice rather than four more entries
 in `backend`. Fall-through assumes the engines are substitutes for one another;

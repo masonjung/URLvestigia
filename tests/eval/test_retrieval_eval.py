@@ -64,6 +64,11 @@ class TestRetrievalContract:
         """
         def _install(results):
             class Fake:
+                # `urlvestigia` configures the client with a timeout and proxy, so a
+                # stand-in has to accept construction arguments.
+                def __init__(self, **kwargs):
+                    pass
+
                 def text(self, query, **kwargs):
                     return results
             monkeypatch.setattr(urlvestigia, "DDGS", Fake)

@@ -220,6 +220,28 @@ def test_a_failure_names_the_provider_and_engines(client, monkeypatch):
     assert "Web (duckduckgo + yahoo)" in body
 
 
+def test_every_engine_failing_names_each_one_and_why(client, monkeypatch):
+    """The demo failure this exists for: ddgs reports "all engines blocked" as an
+    empty search, so without this it renders as a calm "No results found." — and a
+    dead network becomes indistinguishable from a corpus with nothing in it."""
+    from app import server
+
+    def boom(text, **kwargs):
+        raise server.urlvestigia.EngineError(
+            [("duckduckgo", "HTTP 403"), ("yahoo", "timed out")])
+
+    monkeypatch.setattr(server.urlvestigia, "text_to_urls", boom)
+    response = client.post("/search", data={
+        "text": "a", "provider": "ddgs", "backend": ["duckduckgo", "yahoo"],
+    }, follow_redirects=False)
+
+    body = client.get(response.headers["location"]).text
+    assert "Error" in body
+    assert "no engine answered" in body
+    assert "duckduckgo: HTTP 403" in body
+    assert "yahoo: timed out" in body
+
+
 def test_a_failure_names_a_non_web_provider_without_engines(client, monkeypatch):
     """`backend` is a ddgs concept — naming it for arXiv would claim an engine chain
     that never ran, the same false claim the NULL storage exists to prevent."""

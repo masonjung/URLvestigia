@@ -20,7 +20,7 @@ PORT       ?= 8000
 BACKUP_DIR ?= backups
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev test test-live backup ingest pipelines govern provision deploy new clean
+.PHONY: help install dev doctor test test-live backup ingest pipelines govern provision deploy new clean
 
 ## help: list every target
 help:
@@ -29,6 +29,7 @@ help:
 	@echo "  Develop"
 	@echo "    make install     install runtime + test dependencies"
 	@echo "    make dev         run the Serve layer  → http://127.0.0.1:$(PORT)/"
+	@echo "    make doctor      preflight every provider and engine (run before a demo)"
 	@echo "    make test        the Harden gate (no network)"
 	@echo "    make test-live   add the tests that call real search engines"
 	@echo ""
@@ -61,6 +62,12 @@ install:
 dev:
 	@echo "→ http://127.0.0.1:$(PORT)/"
 	$(PYTHON) -m uvicorn app.server:app --reload --port $(PORT)
+
+## doctor: probe every provider and engine, and say whether this machine is demo-ready
+# Calls real services, like test-live. A blocked engine here is a measurement of this
+# network, not a defect in the repo — which is why it does not fail the target.
+doctor:
+	$(PYTHON) scripts/doctor.py
 
 ## test: the Harden gate — no network, deterministic
 test:

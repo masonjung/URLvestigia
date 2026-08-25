@@ -158,6 +158,14 @@ def search(
             timelimit=timelimit or None,
             backend=backend,
         )
+    except urlvestigia.EngineError as exc:
+        # Every engine failed and each said why. ddgs reports this as an empty
+        # search, so without naming the engines it would reach the user as an
+        # ordinary "No results found." — a dead network wearing the face of an
+        # empty corpus, which is what made a failed demo unreadable from the room.
+        where = PROVIDER_LABELS.get(provider, provider)
+        detail = ", ".join(f"{engine}: {reason}" for engine, reason in exc.failures)
+        return _redirect(f"Error: {where} search failed — no engine answered — {detail}")
     except Exception as exc:
         # Name what failed. The exception text comes from whichever library made the
         # call and says nothing about which corpus was searched or, for a chain of

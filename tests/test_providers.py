@@ -396,6 +396,9 @@ class TestUnsupportedOptionsNeverReachAProvider:
     def test_an_unknown_provider_falls_back_to_the_default(self, monkeypatch):
         """A hand-crafted POST naming a provider that does not exist must not 500."""
         class FakeDDGS:
+            def __init__(self, **kwargs):
+                pass
+
             def text(self, query, **kwargs):
                 return [{"href": "https://example.com/1"}]
 
@@ -414,6 +417,11 @@ class TestDdgsEmptyResults:
     @staticmethod
     def _raising(exc):
         class FakeDDGS:
+            # `urlvestigia` configures the client with a timeout and proxy, so a
+            # stand-in has to accept construction arguments.
+            def __init__(self, **kwargs):
+                pass
+
             def text(self, query, **kwargs):
                 raise exc
 

@@ -25,14 +25,17 @@ five layers in about 20 minutes, on a laptop. Then use
 make install
 make dev                 # → http://127.0.0.1:8000/
 
-# 2. The Harden gate
-make test                # 219 passing, 13 skipped (the live tier)
+# 2. Before a live demo: is this machine actually reaching every corpus?
+make doctor              # probes each provider and web engine, with latency
 
-# 3. See how the whole solution deploys (every step dry-runs)
+# 3. The Harden gate
+make test                # 255 passing, 13 skipped (the live tier)
+
+# 4. See how the whole solution deploys (every step dry-runs)
 make -n deploy
 make help                # list all targets
 
-# 4. Start a new accelerator from this template
+# 5. Start a new accelerator from this template
 make new VERTICAL=healthcare USECASE=readmission-risk
 ```
 
