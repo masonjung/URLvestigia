@@ -1,0 +1,10 @@
+{
+  // app/templates/index.html is a Jinja2 template, not HTML. Its <style> block
+  // contains {% for %} tags that only become valid CSS once the server renders
+  // them, so VS Code's embedded-CSS parser reports selector errors that are not
+  // errors. See the generated block under "Which controls a provider hides".
+  //
+  // Scoped to embedded styles on purpose: standalone .css files keep full
+  // validation, and HTML structure checking stays on.
+  "html.validate.styles": false
+}

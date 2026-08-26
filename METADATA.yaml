@@ -11,9 +11,12 @@ reprise_link: "https://[catalog-url]/urlvestigia"          # Public reprise link
 catalog_classification:
   - Enterprise Blueprint                     # Options: Enterprise Blueprint | Research | Launchable (AMP) | Developer Example
 launchable: false                            # No .project-metadata.yaml — this is a Forge template, not an AMP
-lifecycle_status: Active                     # Maintained, not retired. NOTE: the repo is
-                                             # ⚠️ incomplete at the Harden gate — see "Status"
-                                             # in README.md before this is offered for deployment.
+lifecycle_status: Active                     # Maintained, not retired. The web-search
+                                             # capability is complete; storage currently ends
+                                             # at SQLite, and the CDP/Iceberg tier is written
+                                             # but not yet connected. Three Harden items stand
+                                             # before this is hosted -- see "Status" and
+                                             # "Planned platform integration" in README.md.
 
 # --- Industry & alignment ---
 industry: General                            # e.g., General | Telecom | Financial Services | Healthcare & Life Sciences | Retail | Media | Physical AI & Robotics
@@ -30,7 +33,11 @@ tags:
   - accelerator-template
 
 # --- Relationships ---
-product_mapping:                             # Cloudera products used — see docs/ARCHITECTURE.md "Layer by layer"
+product_mapping:                             # TARGET integration, not exercised. Only the two AI
+                                             # entries run today, and only locally; the CDE / CDW /
+                                             # SDX paths dry-run and stop. See "Planned platform
+                                             # integration" in README.md and the state column in
+                                             # docs/ARCHITECTURE.md "Layer by layer".
   - Cloudera AI Application                  # Serve — app/, FastAPI + Jinja2
   - Cloudera AI Workbench                    # AI — retrieval/urlvestigia.py, text_to_urls()
   - Cloudera Data Engineering                # Ingest + Process — data/ingest/, pipelines/

@@ -4,16 +4,22 @@ The reference front-end. This is what a stakeholder actually opens, and the only
 layer with a UI.
 
 URLvestigia's Serve layer is **FastAPI + Jinja2, rendered entirely server-side with no
-JavaScript and no build step**. That is a deliberate choice, not a gap: the whole
+build step and no framework**. That is a deliberate choice, not a gap: the whole
 accelerator installs with `make install` and runs with one command, which keeps the
 Discover → Qualify demo loop short.
+
+The single exception is ~40 lines of inline script that put the Search button into a
+spinning "Searching… 12s" state while the post is in flight — a search blocks for up
+to ~38s, and without it the page looks hung. It is progressive enhancement: with
+scripting off the form posts exactly as before. Reasoning in
+[`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 
 ## What's here
 
 | Path | What it is |
 |---|---|
 | `server.py` | The FastAPI app: renders the page, handles form posts, validates every option against a whitelist |
-| `templates/index.html` | The entire UI — one Jinja2 template, HTML + CSS only |
+| `templates/index.html` | The entire UI — one Jinja2 template: HTML, CSS, and one inline progressive-enhancement script |
 | `requirements.txt` | This layer's dependencies, pulling in `retrieval/` since `server.py` imports it |
 | `__init__.py` | Makes `app` importable so `uvicorn app.server:app` resolves |
 

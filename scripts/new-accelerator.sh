@@ -99,7 +99,10 @@ for dir in "${EXAMPLE_DIRS[@]}"; do
     find "${DEST}/${dir}" -mindepth 1 -not -name 'README.md' -delete 2>/dev/null || true
   fi
 done
-run rm -f "${DEST}/scripts/example.py"
+# Both are this accelerator's own: example.py demonstrates text_to_urls(), and
+# doctor.py probes URLvestigia's four providers by name and imports the retrieval
+# modules step 2 just deleted. Left in place they would not run at all.
+run rm -f "${DEST}/scripts/example.py" "${DEST}/scripts/doctor.py"
 
 # --- 3. Re-point the name --------------------------------------------------
 step "3/5  Re-point the accelerator name"
@@ -108,12 +111,16 @@ if $DRY_RUN; then
   echo "    rewrite urlvestigia-dev → ${VERTICAL}-${USECASE}-dev"
 else
   # -print0/-0 so a path with a space cannot split the argument list.
+  # No \b word boundaries below: that is a GNU extension, and BSD sed (the
+  # default on macOS) does not support it -- the rename would silently no-op
+  # there and the new repo would keep this template's name. Plain
+  # substitution is safe because no identifier contains these as a substring.
   find "$DEST" -type f \( -name '*.md' -o -name 'Makefile' -o -name '*.yml' \
        -o -name '*.sh' -o -name '*.tf' \) -print0 \
     | xargs -0 sed -i.bak \
         -e "s/cloudera-forge-<vertical>-<usecase>/${NAME}/g" \
         -e "s/urlvestigia-dev/${VERTICAL}-${USECASE}-dev/g" \
-        -e "s/\bURLvestigia\b/${NAME}/g"
+        -e "s/URLvestigia/${NAME}/g"
   find "$DEST" -name '*.bak' -delete
 fi
 
@@ -160,6 +167,56 @@ make -n deploy     # dry-run the standard deploy
 lifecycle is ~8 weeks from selected use case to a deployed, governed solution.
 EOF
   echo "    ${DEST}/README.md"
+
+  # Identity fields are blanked rather than inherited. A catalog entry carrying
+  # the template's slug, description, tags, GitHub link, and maintainer while
+  # showing a new name is worse than an empty one -- it looks filled in, and the
+  # first person to trust it publishes someone else's repo under this name.
+  cat > "${DEST}/METADATA.yaml" <<EOF
+# Cloudera Blueprint catalog metadata
+# Every field below is a placeholder. Fill them in before catalog submission.
+
+# --- Identity ---
+name: ""                                     # Human-readable title
+slug: "${NAME}"                              # URL-safe repo / catalog identifier
+description: ""                              # One sentence: what goes in, what comes out
+reprise_link: ""                             # Public reprise link
+
+# --- Classification (website filters) ---
+catalog_classification:
+  - Enterprise Blueprint                     # Enterprise Blueprint | Research | Launchable (AMP) | Developer Example
+launchable: false
+lifecycle_status: Draft                      # Draft until it clears the Harden gate -- see docs/GATES.md
+
+# --- Industry & alignment ---
+industry: General
+industry_alignment: ""                       # Horizontal | Vertical
+target_vertical: "${VERTICAL}"
+
+# --- Tags (website search & browse) ---
+tags:
+  - ${VERTICAL}
+  - ${USECASE}
+
+# --- Relationships ---
+product_mapping: []                          # Cloudera products actually used -- see docs/ARCHITECTURE.md
+
+# --- Provenance ---
+publisher: cloudera                          # cloudera | partner-name
+source: Internal                             # Internal | Partner | NVIDIA Adaptation | Customer
+
+# --- Repository & assets ---
+public_github_link: ""
+
+# --- Ownership ---
+maintainer_name: ""
+
+# --- Dates ---
+date_created: ""
+date_updated: ""
+published_date: ""
+EOF
+  echo "    ${DEST}/METADATA.yaml"
 fi
 
 # --- 5. Fresh git history --------------------------------------------------

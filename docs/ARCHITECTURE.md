@@ -1,54 +1,30 @@
 # URLvestigia — architecture
 
-Natural-language text in, a governed table of URLs out. One capability, wired across
-all five layers of the reference stack.
+Natural-language text in, a governed table of URLs out. One capability, designed
+across all five layers of the reference stack.
+
+**What runs and what does not.** The Serve, AI, and local-storage layers execute
+today. Everything platform-side — Iceberg, Spark, CDE, Ranger, and the CDP
+provisioning under `infra/` — is designed and committed but **has never been
+executed against a real environment**; those paths dry-run and stop. This document
+describes the intended architecture throughout, so read the state column below
+before treating any of it as deployed. See "Planned platform integration" in
+[`../README.md`](../README.md).
 
 ## The stack
 
-```
-                 ┌─────────────────────────────────────────────┐
-   user  ──────► │  SERVE      app/                            │
-   "cloudera     │             FastAPI + Jinja2, no JavaScript │
-    cdp use      └────────────────┬────────────────────────────┘
-    cases"                        │
-                 ┌────────────────▼────────────────────────────┐     one provider
-                 │  AI         retrieval/urlvestigia.py              │     per search
-                 │             text_to_urls()                  │ ──► ddgs ─► DuckDuckGo
-                 │             retrieval/providers.py          │     │       Yahoo
-                 │             one corpus per search           │     │       Startpage
-                 └────────────────┬────────────────────────────┘     │       Yandex
-                                  │ URLs, deduped, rank order        ├─► Wikipedia
-                                  │                                  ├─► OpenAlex
-                                  │                                  └─► arXiv
-                 ┌────────────────▼────────────────────────────┐
-                 │  INGEST     data/db.py        (SQLite, dev) │
-                 │             data/ingest/      (→ Iceberg)   │
-                 └────────────────┬────────────────────────────┘
-                 ┌────────────────▼────────────────────────────┐
-                 │  LAKEHOUSE  urlvestigia.raw_searches              │
-                 │             urlvestigia.raw_search_urls           │
-                 └────────────────┬────────────────────────────┘
-                 ┌────────────────▼────────────────────────────┐
-                 │  PROCESS    pipelines/jobs/url_enrichment   │
-                 │             normalise · dedupe · enrich     │
-                 └────────────────┬────────────────────────────┘
-                                  ▼
-                          urlvestigia.curated_urls
-
-         ══════════ governed end to end by SDX ══════════
-         Ranger policies · Atlas lineage · model card
-```
+![The URLvestigia stack](img/architecture-stack.png)
 
 ## Layer by layer
 
-| Layer | Directory | Component | Cloudera service |
-|---|---|---|---|
-| **Serve** | `app/` | FastAPI + Jinja2 dashboard | Cloudera AI Application |
-| **AI** | `retrieval/` | `text_to_urls()` — metasearch retrieval | Cloudera AI Workbench |
-| **Ingest** | `data/ingest/` | SQLite → Iceberg batch loader | Cloudera Data Engineering |
-| **Lakehouse** | `data/iceberg/` | `raw_searches`, `raw_search_urls`, `curated_urls` | Iceberg on CDW / Data Lake |
-| **Process** | `pipelines/` | URL normalisation and enrichment | Cloudera Data Engineering |
-| **Governance** | `governance/` | Ranger policies, model card, classification | SDX |
+| Layer | Directory | Component | Cloudera service | State |
+|---|---|---|---|---|
+| **Serve** | `app/` | FastAPI + Jinja2 dashboard | Cloudera AI Application | runs locally |
+| **AI** | `retrieval/` | `text_to_urls()` — metasearch retrieval | Cloudera AI Workbench | runs locally |
+| **Ingest** | `data/ingest/` | SQLite → Iceberg batch loader | Cloudera Data Engineering | dry run only |
+| **Lakehouse** | `data/iceberg/` | `raw_searches`, `raw_search_urls`, `curated_urls` | Iceberg on CDW / Data Lake | DDL never applied |
+| **Process** | `pipelines/` | URL normalisation and enrichment | Cloudera Data Engineering | dry run only |
+| **Governance** | `governance/` | Ranger policies, model card, classification | SDX | never imported |
 
 **On the AI layer's directory name.** The Forge standard calls this layer `ai/`, and
 URLvestigia deliberately does not. There is no model here and no inference: the layer is
@@ -86,11 +62,32 @@ a laptop during Discover, before any CDP environment exists. The two tiers share
 schema shape, and `data/ingest/load_to_iceberg.py` is the bridge. What would be
 wrong is *pretending* SQLite is the production store; the split is explicit.
 
-**No JavaScript in the Serve layer.** The whole accelerator installs with
+**No JavaScript beyond a submit indicator.** The whole accelerator installs with
 `make install` and runs with one command. That keeps the
 Discover → Qualify demo loop short, which is worth more here than a richer UI. The
 cost is real — no incremental updates, a full page render per action — and the
 swap path is documented in [`app/README.md`](../app/README.md).
+
+The rule is *no build step and no framework*, not zero `<script>` tags, and one
+exception earns its place. A search is a synchronous form post that blocks for up
+to 12s on `ddgs` and ~38s on an arXiv stall, and the page had no way to say so:
+the button stayed idle, the table stayed still, and the only feedback was the
+browser's tab spinner — invisible on a projector. Watching a demo audience decide
+the app had hung is the failure this closes.
+
+So `index.html` carries roughly forty lines of inline script that disable the
+submit button, spin it, and count elapsed seconds past three. It is progressive
+enhancement in the strict sense: **with scripting off, the form posts exactly as
+it did before and none of it runs**, which is why the test suite — which executes
+no JavaScript — still covers the whole Serve layer unchanged. No dependency, no
+bundler, no `package.json`.
+
+What it deliberately is *not* is real progress. Per-engine status ("querying
+yahoo…") is not available to a synchronous form post; it would need the search
+moved to a background task plus a status endpoint to poll, which is a different
+architecture and wants an ADR. The indicator says *still working, this long* —
+which is the honest claim, and the one that stops a viewer concluding the app
+died.
 
 **Multi-engine is resilience, and its mechanics are ddgs's, not ours.** Selecting
 several engines makes a throttled one survivable rather than fatal — that part holds,

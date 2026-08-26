@@ -65,6 +65,12 @@ Stated here rather than discovered at a customer review:
   that is in `DATA_CLASSIFICATION.md`.
 - **The retrieval model card has no recorded evaluation.** Due at the Harden gate;
   run `retrieval/notebooks/eval.ipynb`.
+- **The Serve layer has no authentication and no CSRF protection.** `/clear`,
+  `/delete/{id}`, `/dedupe`, and `/store` act on an unauthenticated POST, and
+  `/clear` is destructive. This is correct for a `127.0.0.1` demo and wrong the
+  moment the app is hosted — `.cicd/deploy.sh app` publishes it as a Cloudera AI
+  Application behind Knox, which authenticates the *user* but does not make the
+  routes safe against a cross-site POST. Fix before the first hosted deployment.
 
 ## Which Cloudera tool automates it
 

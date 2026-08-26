@@ -172,7 +172,7 @@ in particular **what it must not be used for**. URLvestigia cannot tell you a do
 not exist. Absence from the results means an engine did not rank it in the top N.
 
 Note what the model card does *not* have: a dated evaluation. That is a real gap, and
-it is why URLvestigia sits at ⚠️ on the Harden gate.
+it is why the Harden gate is still open.
 
 ---
 

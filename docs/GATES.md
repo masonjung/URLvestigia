@@ -141,13 +141,13 @@ Honest status, not aspiration:
 
 | Gate | Status |
 |---|---|
-| Discover | ✅ |
-| Qualify | ✅ |
-| Architect | ✅ [`ARCHITECTURE.md`](ARCHITECTURE.md), [`BUSINESS_CASE.md`](BUSINESS_CASE.md) |
-| Build | ✅ every layer wired, `make dev` works |
-| **Harden** | ⚠️ **incomplete** — tests are green, but the model card has **no dated eval run**, `raw_searches` has **no row-level retention**, and `ingress_cidrs` still defaults to `0.0.0.0/0` |
-| Publish | ⚠️ blocked on Harden |
+| Discover | Cleared |
+| Qualify | Cleared |
+| Architect | Cleared — [`ARCHITECTURE.md`](ARCHITECTURE.md), [`BUSINESS_CASE.md`](BUSINESS_CASE.md) |
+| Build | Cleared for the web edge — app, retrieval, and SQLite storage all run (`make dev`, `make test`). The CDP platform layers are written and dry-run clean, awaiting an environment to connect to |
+| **Harden** | Open — the suite is green and the capability is solid, but three items stand before this is served to anyone: no authentication or CSRF protection, no dated eval run on the model card, and `ingress_cidrs` at `0.0.0.0/0` |
+| Publish | Follows Harden |
 
-The three Harden gaps are tracked in
+The three open items are tracked in
 [`governance/README.md`](../governance/README.md#known-gaps). None is hard; all three
 are unfinished.

@@ -1,9 +1,14 @@
-"""URLvestigia Serve layer — everything is rendered server-side, no JavaScript.
+"""URLvestigia Serve layer — everything is rendered server-side; no build step.
+
+The template carries one inline progressive-enhancement script for the Search
+button's in-flight state. Nothing here depends on it: with scripting off every
+route behaves identically.
 
 Run:  make dev   (or: uvicorn app.server:app --reload)
 then open http://127.0.0.1:8000/
 """
 
+import logging
 import shutil
 import sys
 import tempfile
@@ -27,6 +32,14 @@ from starlette.background import BackgroundTask
 app = FastAPI(title="URLvestigia")
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 db.init_db()
+
+# Every route below turns an exception into a flash message, which is the right
+# thing for the user and useless for whoever has to fix it: the message reaches a
+# browser and the traceback reached nothing at all. These handlers log before they
+# redirect, so a failure a colleague reports as "it said search failed" has a
+# stack trace waiting on the server console. Uvicorn configures the root handler;
+# nothing here needs its own.
+log = logging.getLogger("urlvestigia.serve")
 
 # Allowed values per search option; first entry is the default fallback.
 #
@@ -159,6 +172,8 @@ def search(
             backend=backend,
         )
     except urlvestigia.EngineError as exc:
+        log.warning("%s search failed: every engine errored (%s) for %r",
+                    provider, exc, text)
         # Every engine failed and each said why. ddgs reports this as an empty
         # search, so without naming the engines it would reach the user as an
         # ordinary "No results found." — a dead network wearing the face of an
@@ -167,6 +182,9 @@ def search(
         detail = ", ".join(f"{engine}: {reason}" for engine, reason in exc.failures)
         return _redirect(f"Error: {where} search failed — no engine answered — {detail}")
     except Exception as exc:
+        # exception() not warning(): unlike the branch above, this catches bugs as
+        # well as outages, and a bug with no traceback is invisible.
+        log.exception("%s search raised for %r", provider, text)
         # Name what failed. The exception text comes from whichever library made the
         # call and says nothing about which corpus was searched or, for a chain of
         # four engines, which of them was asked — so the bare message left the user
@@ -214,6 +232,7 @@ def store():
         return _redirect("Error: a snapshot for this second already exists — "
                          "wait a moment and press Store again.")
     except Exception as exc:
+        log.exception("backup failed")
         return _redirect(f"Error: backup failed — {exc}")
     # Counted out of the finished file rather than the live store: it proves the
     # snapshot opens as a database, which is the only part of "it worked" a
@@ -251,6 +270,7 @@ def download():
         shutil.rmtree(tmp_dir, ignore_errors=True)
         return _redirect("Error: nothing to download yet — run a search first.")
     except Exception as exc:
+        log.exception("download snapshot failed")
         shutil.rmtree(tmp_dir, ignore_errors=True)
         return _redirect(f"Error: download failed — {exc}")
     # `filename` is what sets Content-Disposition: attachment, which is the whole

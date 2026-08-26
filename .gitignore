@@ -51,5 +51,10 @@ derby.log
 # OS / editor / local tooling
 .DS_Store
 Thumbs.db
-.vscode/
+# .vscode/ stays ignored, with one exception: settings.json records a fact about
+# the file format rather than a personal preference -- app/templates/index.html is
+# a Jinja2 template, so VS Code flags its <style> block as broken CSS for everyone
+# who opens the repo, not just its author.
+.vscode/*
+!.vscode/settings.json
 .idea/

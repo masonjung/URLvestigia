@@ -189,6 +189,45 @@
       button:active { transform: translateY(1px); box-shadow: 0 3px 10px rgba(245, 130, 31, 0.25); }
       button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
+      /* ---------- Searching state ----------
+         A search is a synchronous form post that can run 12s (ddgs) to ~38s
+         (arXiv retrying a stall). Without this the page looks inert for that
+         whole window and the only feedback is the browser's tab spinner, which
+         on a projector nobody can see. Progressive enhancement only: with
+         scripting off the form still posts and this state never applies. */
+      .actions { align-items: center; gap: 0.85rem; }
+      button[aria-busy="true"] {
+        cursor: progress;
+        filter: saturate(0.75) brightness(0.97);
+        box-shadow: 0 3px 10px rgba(245, 130, 31, 0.2);
+      }
+      button[aria-busy="true"]:hover { filter: saturate(0.75) brightness(0.97); }
+      .spinner {
+        display: none;
+        width: 0.85em; height: 0.85em; flex: none;
+        border: 2px solid rgba(29, 18, 6, 0.28);
+        border-top-color: var(--accent-ink);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      button[aria-busy="true"] .spinner { display: inline-block; }
+      /* Scoped to this button, not `button`: .head-btn and .row-del are single
+         text nodes and inline-flex would shift their baselines for nothing. */
+      #search-btn { display: inline-flex; align-items: center; gap: 0.05rem; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      /* The elapsed counter carries the progress on its own when animation is
+         unwelcome, so the spinner stops rather than disappears. */
+      @media (prefers-reduced-motion: reduce) {
+        .spinner { animation: none; border-top-color: rgba(29, 18, 6, 0.28); }
+      }
+      /* Reassurance, not a countdown: it appears only once a search has run
+         long enough to look stuck. */
+      .elapsed {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        opacity: 0.75;
+      }
+
       /* ---------- Status ---------- */
       #status {
         margin: 1.1rem 0 0; min-height: 1.4em;
@@ -370,7 +409,11 @@
             safe search</span>.
         </p>
         <div class="actions">
-          <button type="submit">Search</button>
+          <button type="submit" id="search-btn">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-label">Search</span>
+            <span class="elapsed" aria-hidden="true"></span>
+          </button>
         </div>
       </form>
 
@@ -459,5 +502,60 @@
         </div>
       </section>
     </main>
+
+    <!-- The only script in the repo, and deliberately the smallest one that
+         closes the gap: a search blocks for up to ~38s and the page had no way
+         to say so. Progressive enhancement -- with scripting off the form posts
+         exactly as before and nothing below ever runs. No build step, no
+         dependency, no framework; see docs/ARCHITECTURE.md "No JavaScript
+         beyond a submit indicator". -->
+    <script>
+      (function () {
+        var form = document.querySelector("form.search");
+        var btn = document.getElementById("search-btn");
+        if (!form || !btn) return;
+        var label = btn.querySelector(".btn-label");
+        var elapsed = btn.querySelector(".elapsed");
+        var timer = null;
+
+        function reset() {
+          if (timer) { clearInterval(timer); timer = null; }
+          btn.removeAttribute("aria-busy");
+          btn.disabled = false;
+          label.textContent = "Search";
+          elapsed.textContent = "";
+        }
+
+        form.addEventListener("submit", function () {
+          // A blank query is `required`, so the browser blocks submission and
+          // never fires this -- but a whitespace-only one passes `required` and
+          // the server discards it. Bailing here keeps the button from spinning
+          // forever on a redirect that returns almost instantly.
+          var text = form.elements.text;
+          if (text && !text.value.trim()) return;
+
+          btn.setAttribute("aria-busy", "true");
+          label.textContent = "Searching";
+          // Disabling synchronously would cancel the post in some browsers, so
+          // it happens after the submission is already under way.
+          setTimeout(function () { btn.disabled = true; }, 0);
+
+          var start = Date.now();
+          timer = setInterval(function () {
+            var seconds = Math.floor((Date.now() - start) / 1000);
+            // Silent for the first three seconds: most searches finish inside
+            // that, and a counter on a fast search is noise, not progress.
+            elapsed.textContent = seconds >= 3 ? seconds + "s" : "";
+          }, 250);
+        });
+
+        // Restoring from the back/forward cache replays the DOM as it was left
+        // -- mid-search, button disabled. Without this the page comes back
+        // permanently stuck on "Searching".
+        window.addEventListener("pageshow", function (event) {
+          if (event.persisted) reset();
+        });
+      })();
+    </script>
   </body>
 </html>

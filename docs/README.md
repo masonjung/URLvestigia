@@ -20,7 +20,7 @@ answers *what*, *why*, and *is it done*.
   Architect-phase artifacts. A design written after the code is a description, not a
   decision.
 - **State gaps here, not in a review.** [`GATES.md`](GATES.md#where-urlvestigia-stands)
-  says URLvestigia is ⚠️ on Harden and names all three reasons. A known gap you wrote down
+  says the Harden gate is open and names all three reasons. A known gap you wrote down
   is a plan; the same gap found by a customer's reviewer is a problem.
 - **Mark estimates as estimates.** `BUSINESS_CASE.md` tags unmeasured figures
   _(estimate)_. Numbers presented as fact are how a scorecard stops being useful.
