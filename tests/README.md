@@ -29,7 +29,7 @@ pytest tests -q -k dedupe     # one behaviour
 Install with `pip install -r app/requirements.txt -r tests/requirements.txt`, or
 just `make install`.
 
-Current state: **219 passing, 13 skipped** (the live tier).
+Current state: **255 passing, 13 skipped** (the live tier).
 
 ## The two tiers
 

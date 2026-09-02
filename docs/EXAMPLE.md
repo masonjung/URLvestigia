@@ -11,7 +11,7 @@ Budget about 20 minutes.
 
 ```bash
 pip install -r app/requirements.txt -r tests/requirements.txt
-make test          # 219 passing, 13 skipped (the live tier)
+make test          # 255 passing, 13 skipped (the live tier)
 ```
 
 If that is green, every layer imports and every contract holds. Start here — a
@@ -43,7 +43,10 @@ the fallback chain exists for:
 text_to_urls("Cloudera CDP use cases", backend="duckduckgo,yahoo,startpage")
 ```
 
-`ddgs` tries each in order and stops once it has enough. → [`retrieval/README.md`](../retrieval/README.md)
+`ddgs` queries every listed engine concurrently and pools whichever results come back
+first — the list is a resilience set, not a priority chain. →
+[`retrieval/README.md`](../retrieval/README.md) ·
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md#decisions-worth-defending)
 
 ---
 
@@ -58,7 +61,8 @@ Type a question, pick engines, hit **Search**. What happens:
 1. `POST /search` — every option is whitelisted against `OPTIONS` in
    [`app/server.py`](../app/server.py); `max_results` is clamped to 1–50.
 2. Checked engines are filtered, deduplicated, and joined into a fallback chain.
-   Order is preserved because order is meaningful.
+   Order is preserved for a reproducible request record, not because engines are
+   tried in sequence — see step 1.
 3. `urlvestigia.text_to_urls()` runs.
 4. `db.save_search()` persists the query, its full option set, and the URLs.
 5. **303 redirect** back to `/` with a flash message — reloading never re-runs the

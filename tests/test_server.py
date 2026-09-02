@@ -88,15 +88,14 @@ def test_no_engine_selected_falls_back_to_every_engine(client):
     Resilience, not coverage: a wider selection can return *fewer* URLs than the best
     single engine (see docs/ARCHITECTURE.md), but a blocked engine stops being fatal.
     """
-    from app import server
-
     client.post("/search", data={"text": "a"})
 
     assert client.search_calls[0]["backend"] == ",".join(server.OPTIONS["backend"])
 
 
 def test_engine_order_and_uniqueness_are_preserved(client):
-    """Order is meaningful — it is the fallback chain, not a set."""
+    """The stored order matches what was asked, deduplicated — a reproducible
+    record, not a priority chain ddgs honors (see docs/ARCHITECTURE.md)."""
     client.post("/search", data={
         "text": "a",
         "backend": ["yahoo", "duckduckgo", "yahoo", "startpage"],
@@ -168,7 +167,6 @@ def test_supported_but_unset_is_stored_empty_not_null(client, temp_db):
     client.post("/search", data={"text": "a", "provider": "ddgs", "timelimit": ""})
 
     row = temp_db.list_searches()[0]
-    from app import server
 
     assert row["timelimit"] == ""
     assert row["safesearch"] == "moderate"
@@ -188,8 +186,6 @@ def test_scholarly_provider_records_its_time_window(client, temp_db):
 # --- result handling -------------------------------------------------------
 
 def test_retrieval_error_surfaces_as_a_message(client, monkeypatch):
-    from app import server
-
     def boom(text, **kwargs):
         raise RuntimeError("rate limited")
 
@@ -206,8 +202,6 @@ def test_retrieval_error_surfaces_as_a_message(client, monkeypatch):
 def test_a_failure_names_the_provider_and_engines(client, monkeypatch):
     """The library's own text says nothing about what was searched. Without this the
     user cannot tell a blocked engine from a query with no matches."""
-    from app import server
-
     def boom(text, **kwargs):
         raise RuntimeError("rate limited")
 
@@ -224,8 +218,6 @@ def test_every_engine_failing_names_each_one_and_why(client, monkeypatch):
     """The demo failure this exists for: ddgs reports "all engines blocked" as an
     empty search, so without this it renders as a calm "No results found." — and a
     dead network becomes indistinguishable from a corpus with nothing in it."""
-    from app import server
-
     def boom(text, **kwargs):
         raise server.urlvestigia.EngineError(
             [("duckduckgo", "HTTP 403"), ("yahoo", "timed out")])
@@ -245,8 +237,6 @@ def test_every_engine_failing_names_each_one_and_why(client, monkeypatch):
 def test_a_failure_names_a_non_web_provider_without_engines(client, monkeypatch):
     """`backend` is a ddgs concept — naming it for arXiv would claim an engine chain
     that never ran, the same false claim the NULL storage exists to prevent."""
-    from app import server
-
     def boom(text, **kwargs):
         raise RuntimeError("timed out")
 
@@ -263,8 +253,6 @@ def test_a_failure_names_a_non_web_provider_without_engines(client, monkeypatch)
 
 def test_no_results_is_reported_not_silently_saved(client, monkeypatch):
     """An empty result set must not be persisted as a successful search."""
-    from app import server
-
     monkeypatch.setattr(server.urlvestigia, "text_to_urls", lambda text, **kw: [])
     response = client.post("/search", data={"text": "a"}, follow_redirects=False)
 
@@ -392,7 +380,6 @@ def test_delete_removes_one_row(client):
     client.post("/search", data={"text": "zeta-survivor-query"})
     client.post("/search", data={"text": "omega-doomed-query"})
 
-    from app import server
     doomed = next(r["id"] for r in server.db.list_searches()
                   if r["query"] == "omega-doomed-query")
     client.post(f"/delete/{doomed}")
@@ -424,8 +411,6 @@ def test_clear_empties_the_table(client):
 # --- Store -----------------------------------------------------------------
 
 def test_store_writes_a_snapshot_and_reports_its_contents(client):
-    from app import server
-
     client.post("/search", data={"text": "a"})
     response = client.post("/store", follow_redirects=False)
 
@@ -503,8 +488,6 @@ def test_download_before_any_search_explains_itself(client, temp_db):
 def test_store_leaves_the_live_table_untouched(client):
     """Storing is the one header action that changes nothing in the store — the
     guarantee that makes it safe to sit beside Clear all."""
-    from app import server
-
     client.post("/search", data={"text": "zeta-survivor-query"})
     before = server.db.stats()
 
@@ -518,8 +501,6 @@ def test_store_reports_a_second_press_as_a_failure_not_a_success(client, monkeyp
     """Snapshot names are second-resolution, so a double-click writes nothing the
     second time. Reporting that as "Stored" would claim a backup that does not
     exist — the same false claim the NULL option columns exist to prevent."""
-    from app import server
-
     monkeypatch.setattr(server.backup, "snapshot",
                         lambda *a, **kw: (_ for _ in ()).throw(FileExistsError("x.db")))
     response = client.post("/store", follow_redirects=False)
@@ -530,8 +511,6 @@ def test_store_reports_a_second_press_as_a_failure_not_a_success(client, monkeyp
 
 
 def test_store_failure_surfaces_as_a_message(client, monkeypatch):
-    from app import server
-
     def boom(*args, **kwargs):
         raise OSError("disk full")
 

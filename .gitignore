@@ -27,7 +27,6 @@ backups/
 *.tfstate
 *.tfstate.*
 *.tfvars
-!example.tfvars
 crash.log
 
 # Cloudera / CDP

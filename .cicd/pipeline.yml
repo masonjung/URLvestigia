@@ -80,7 +80,20 @@ verify-jobs:
   needs: [build]
   script:
     - pip install -r app/requirements.txt
-    - python data/ingest/load_to_iceberg.py --db /dev/null || true
+    - mkdir -p "$(dirname "$URLVESTIGIA_DB")"
+    # Seed a throwaway row so the dry-run plan has something to report — the
+    # same way the GitHub Actions verify-jobs job does it. Pointing this at
+    # /dev/null with `|| true` would swallow every failure and verify nothing.
+    - |
+      python -c "
+      import sys; sys.path.insert(0, 'data')
+      import db
+      db.init_db()
+      db.save_search('ci probe', ['https://example.org/a'], provider='ddgs',
+                     region='wt-wt', safesearch='moderate', timelimit='',
+                     backend='duckduckgo', max_results=10)
+      "
+    - python data/ingest/load_to_iceberg.py --db "$URLVESTIGIA_DB"
     - python pipelines/jobs/url_enrichment.py            # dry run prints the MERGE
     - python -c "import json; json.load(open('governance/sdx/ranger-policies.json')); print('ranger policies parse OK')"
     - bash -n infra/cdp/provision.sh && echo "provision.sh syntax OK"

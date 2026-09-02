@@ -25,7 +25,7 @@ for arg in "$@"; do
   case "$arg" in
     govern|jobs|app|all) TARGET="$arg" ;;
     --execute)           EXECUTE=true ;;
-    -h|--help)           sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)           sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done

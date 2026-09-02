@@ -13,7 +13,28 @@ before treating any of it as deployed. See "Planned platform integration" in
 
 ## The stack
 
-![The URLvestigia stack](img/architecture-stack.png)
+```mermaid
+flowchart LR
+    subgraph SYNC["Synchronous request — runs today"]
+        SERVE["Serve<br/>app/<br/>FastAPI + Jinja2"]
+        AI["AI<br/>retrieval/<br/>text_to_urls()"]
+        SQLITE[("SQLite tier<br/>data/db.py<br/>running today")]
+        SERVE --> AI --> SQLITE
+    end
+
+    subgraph BATCH["Batch path — designed, never run for real"]
+        INGEST["Ingest<br/>data/ingest/<br/>SQLite to Iceberg loader"]
+        ICEBERG[("Iceberg tier<br/>data/iceberg/<br/>DDL written, never applied")]
+        PROCESS["Process<br/>pipelines/<br/>URL enrichment (MERGE)"]
+        INGEST --> ICEBERG --> PROCESS
+    end
+
+    SQLITE -. "scheduled job" .-> INGEST
+
+    GOV["Governance — SDX (Ranger, Atlas)<br/>governance/ — policies written, never imported"]
+    GOV -.-> SYNC
+    GOV -.-> BATCH
+```
 
 ## Layer by layer
 
@@ -42,9 +63,9 @@ A search is synchronous and touches three layers:
 1. **`POST /search`** — `app/server.py` whitelists every option against `OPTIONS`,
    clamps `max_results` to 1–50, and joins the checked engines into a fallback chain.
 2. **Retrieval** — `urlvestigia.text_to_urls()` dispatches to the selected provider,
-   dropping any option that provider does not apply. `ddgs` queries web engines in
-   order until it has enough results; the others call one API. Returns URLs
-   deduplicated, in rank order.
+   dropping any option that provider does not apply. `ddgs` queries web engines
+   concurrently and pools whichever results come back first; the others call one
+   API. Returns URLs deduplicated, in rank order.
 3. **Persist** — `db.save_search()` writes the query, the provider, the options that
    were actually applied, and the URLs in one transaction. An option the provider
    does not support is stored `NULL`, distinct from `""` for one it supports and the

@@ -29,7 +29,7 @@ DATALAKE_SCALE="${DATALAKE_SCALE:-LIGHT_DUTY}"
 CDE_SERVICE="${CDE_SERVICE:-${CDP_ENV}-cde}"
 CDE_VC="${CDE_VC:-urlvestigia-vc}"
 AI_WORKBENCH="${AI_WORKBENCH:-${CDP_ENV}-ai}"
-STORAGE_BASE="${STORAGE_BASE:-s3a://urlvestigia-${CDP_ENV}}"
+STORAGE_BASE="${STORAGE_BASE:-s3a://${CDP_ENV}}"
 
 # --- Plumbing --------------------------------------------------------------
 step() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }
